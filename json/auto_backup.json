@@ -1,1 +1,6 @@
-
+{
+    "enabled": true,
+    "interval": "daily",
+    "last_backup": 1768668551.7849867,
+    "notify": true
+}
