@@ -27,9 +27,9 @@ async def add_record(message: Message, state: FSMContext):
     role = fs.get_user_role(user_id, data)
     if role in ["👑 Главный администратор!", "🛠 Администратор!", "👥 Пользователь"]:
         await state.set_state(Register.shop_selection)
-        temp_msg = await message.answer("⌛ Подготавливаю список цехов...",reply_markup=ReplyKeyboardRemove())
-        await asyncio.sleep(0.6)
-        await temp_msg.delete()
+        #temp_msg = await message.answer("⌛ Подготавливаю список цехов...",reply_markup=ReplyKeyboardRemove())
+        #await asyncio.sleep(0.6)
+        #await temp_msg.delete()
         await message.answer('🏭 Выберите цех', reply_markup=workshops)
     else:
         await message.answer('⛔ У вас нет доступа')
