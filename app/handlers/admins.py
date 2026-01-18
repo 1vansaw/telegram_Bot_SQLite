@@ -235,20 +235,25 @@ async def select_restore_source(callback: CallbackQuery, state: FSMContext):
             f for f in os.listdir(settings.DIR_DB)
             if f.startswith('Копия_БД_') and f.endswith('.db')
         ]
+        
+        if not files:  # Если нет локальных копий
+            await callback.message.edit_text("❌ Резервные копии не найдены в папке!")
+            return
+
         files.sort(key=lambda x: os.path.getctime(os.path.join(settings.DIR_DB, x)), reverse=True)
-        files = files[:5]  # ограничим 5 последними
+        files = files[:5]  # Ограничиваем 5 последними
         # Формируем список словарей для единообразия
         backup_files = [{"name": f, "created": datetime.fromtimestamp(os.path.getctime(os.path.join(settings.DIR_DB, f))).strftime("%d.%m.%Y %H:%M")} for f in files]
 
     else:  # yadisk
         # Показываем сообщение о подготовке файлов
         status_message = await callback.message.edit_text("⏳ Подготавливаю файлы с Яндекс.Диска...")
-        
+
         backup_files_data = await fs.list_yadisk_backups()
         if not backup_files_data:
-            await status_message.edit_text("❌ Резервные копии на Яндекс.Диске не найдены!")
+            await status_message.edit_text("❌ Резервные копии на Яндекс Диске не найдены!")
             return
-        backup_files = backup_files_data  # ожидаем [{"name": "Копия_БД_01.db", "created": "2026-01-17 12:00"}]
+        backup_files = backup_files_data  # Ожидаем [{"name": "Копия_БД_01.db", "created": "2026-01-17 12:00"}]
 
     # Клавиатура для выбора копии
     keyboard = [
