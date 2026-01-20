@@ -433,239 +433,239 @@ async def cancel_delete(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-@editor_router.message(F.text == '✅ Добавить контакт')
-async def add_contacts(message: Message, state: FSMContext):
-    await state.clear()
-    await message.answer(
-        "📇 Введите контакт в формате:\n"
-        "ФИО, Телефон, Email, Должность\n\n"
-        "Пример:\n"
-        "Иванов Иван Иванович, +1234567890, example@example.com, директор",
-        reply_markup=ReplyKeyboardRemove())
-    await state.set_state(Register.add_contact)
+# @editor_router.message(F.text == '✅ Добавить контакт')
+# async def add_contacts(message: Message, state: FSMContext):
+#     await state.clear()
+#     await message.answer(
+#         "📇 Введите контакт в формате:\n"
+#         "ФИО, Телефон, Email, Должность\n\n"
+#         "Пример:\n"
+#         "Иванов Иван Иванович, +1234567890, example@example.com, директор",
+#         reply_markup=ReplyKeyboardRemove())
+#     await state.set_state(Register.add_contact)
 
 
-# Обработчик для получения контактной информации
-@editor_router.message(Register.add_contact)
-async def receive_contact(message: Message, state: FSMContext):
-    # Регулярные выражения для проверки формата
-    name_pattern = r'^[A-Za-zА-Яа-яЁё\s-]+$'          # ФИО: буквы, пробелы и дефисы
-    phone_pattern = r'^\+?[0-9\s()-]{7,15}$'          # Телефон: +, цифры, пробелы, скобки, дефисы
-    email_pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'       # Email: стандартный формат
-    position_pattern = r'^[A-Za-zА-Яа-яЁё\s-]+$'      # Должность: буквы, пробелы, дефисы
+# # Обработчик для получения контактной информации
+# @editor_router.message(Register.add_contact)
+# async def receive_contact(message: Message, state: FSMContext):
+#     # Регулярные выражения для проверки формата
+#     name_pattern = r'^[A-Za-zА-Яа-яЁё\s-]+$'          # ФИО: буквы, пробелы и дефисы
+#     phone_pattern = r'^\+?[0-9\s()-]{7,15}$'          # Телефон: +, цифры, пробелы, скобки, дефисы
+#     email_pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'       # Email: стандартный формат
+#     position_pattern = r'^[A-Za-zА-Яа-яЁё\s-]+$'      # Должность: буквы, пробелы, дефисы
 
-    contact_info = message.text.split(", ")
-    contacts = fs.load_contacts()  # Загрузка существующих контактов
+#     contact_info = message.text.split(", ")
+#     contacts = fs.load_contacts()  # Загрузка существующих контактов
 
-    if len(contact_info) == 4:
-        name, phone, email, position = contact_info
+#     if len(contact_info) == 4:
+#         name, phone, email, position = contact_info
 
-        # Проверка формата ФИО
-        if not re.match(name_pattern, name):
-            await message.answer("❌ Неправильный формат ФИО. Используйте только буквы и пробелы.")
-            return
+#         # Проверка формата ФИО
+#         if not re.match(name_pattern, name):
+#             await message.answer("❌ Неправильный формат ФИО. Используйте только буквы и пробелы.")
+#             return
 
-        # Проверка формата телефона
-        if not re.match(phone_pattern, phone):
-            await message.answer("❌ Неправильный формат телефона. Пример: +1234567890")
-            return
+#         # Проверка формата телефона
+#         if not re.match(phone_pattern, phone):
+#             await message.answer("❌ Неправильный формат телефона. Пример: +1234567890")
+#             return
 
-        # Проверка формата email
-        if not re.match(email_pattern, email):
-            await message.answer("❌ Неправильный формат email. Пример: example@example.com")
-            return
+#         # Проверка формата email
+#         if not re.match(email_pattern, email):
+#             await message.answer("❌ Неправильный формат email. Пример: example@example.com")
+#             return
 
-        # Проверка формата должности
-        if not re.match(position_pattern, position):
-            await message.answer("❌ Неправильный формат должности. Используйте только буквы и пробелы.")
-            return
+#         # Проверка формата должности
+#         if not re.match(position_pattern, position):
+#             await message.answer("❌ Неправильный формат должности. Используйте только буквы и пробелы.")
+#             return
 
-        # Проверка на дубликаты
-        for contact in contacts:
-            if contact['phone'] == phone or contact['email'] == email:
-                await message.answer("⚠️ Контакт с таким номером телефона или email уже существует.")
-                return
+#         # Проверка на дубликаты
+#         for contact in contacts:
+#             if contact['phone'] == phone or contact['email'] == email:
+#                 await message.answer("⚠️ Контакт с таким номером телефона или email уже существует.")
+#                 return
 
-        # Сохраняем контакт во временные данные FSM
-        await state.update_data(contact_info=contact_info)
+#         # Сохраняем контакт во временные данные FSM
+#         await state.update_data(contact_info=contact_info)
 
-        # Подтверждение добавления
-        await message.answer(
-            f"✅ Вы хотите добавить контакт?\n\n"
-            f"👤 ФИО: {name}\n"
-            f"📞 Телефон: {phone}\n"
-            f"✉️ Email: {email}\n"
-            f"💼 Должность: {position}",
-            reply_markup=add_contact
-        )
+#         # Подтверждение добавления
+#         await message.answer(
+#             f"✅ Вы хотите добавить контакт?\n\n"
+#             f"👤 ФИО: {name}\n"
+#             f"📞 Телефон: {phone}\n"
+#             f"✉️ Email: {email}\n"
+#             f"💼 Должность: {position}",
+#             reply_markup=add_contact
+#         )
 
-    else:
-        await message.answer(
-            "❌ <b>Неправильный формат контакта!</b>\n\n"
-            "📌 Пожалуйста, используйте формат:\n"
-            "ФИО, Телефон, Email, Должность\n\n"
-            "📝 <b>Пример:</b>\n"
-            "Иванов Иван Иванович, +1234567890, example@example.com, директор\n\n"
-            "ℹ️ Или нажмите кнопку ниже, чтобы вернуться в главное меню.",
-            reply_markup=inline_main_menu,
-            parse_mode="HTML"
-        )
-
-
-@editor_router.callback_query(F.data == "confirm_yes_contact")
-async def confirm_add_contact(callback_query: CallbackQuery, state: FSMContext):
-    # Получаем данные из FSM
-    data = await state.get_data()
-    contact = data.get('contact_info')
-    name, phone, email, position = contact
-
-    # Загрузка существующих контактов
-    contacts = fs.load_contacts()
-
-    # Добавляем новый контакт
-    contacts.append({
-        "name": name,
-        "phone": phone,
-        "email": email,
-        "position": position
-    })
-    fs.save_contacts(contacts)
-
-    # Логируем успешное добавление
-    logger.info(
-        f"✅ Пользователь {callback_query.from_user.id} добавил контакт: {name}, {phone}, {email}, {position}"
-    )
-
-    # Очищаем состояние и возвращаем в главное меню
-    await state.clear()
-    await state.set_state(Register.main_menu)
-
-    # Сообщение о результате с эмодзи
-    await callback_query.message.edit_text(
-        f"✅ Контакт успешно добавлен!\n\n"
-        f"👤 ФИО: {name}\n"
-        f"📞 Телефон: {phone}\n"
-        f"✉️ Email: {email}\n"
-        f"💼 Должность: {position}"
-    )
-
-    await callback_query.message.answer(
-        "🏠 Возврат в главное меню",
-        reply_markup=main
-    )
-
-    # Закрываем спиннер callback
-    await callback_query.answer()
+#     else:
+#         await message.answer(
+#             "❌ <b>Неправильный формат контакта!</b>\n\n"
+#             "📌 Пожалуйста, используйте формат:\n"
+#             "ФИО, Телефон, Email, Должность\n\n"
+#             "📝 <b>Пример:</b>\n"
+#             "Иванов Иван Иванович, +1234567890, example@example.com, директор\n\n"
+#             "ℹ️ Или нажмите кнопку ниже, чтобы вернуться в главное меню.",
+#             reply_markup=inline_main_menu,
+#             parse_mode="HTML"
+#         )
 
 
-@editor_router.callback_query(F.data == "confirm_no_contact")
-async def cancel_add_contact(callback_query: CallbackQuery, state: FSMContext):
-    logger.info(f"❌ Пользователь {callback_query.from_user.id} отменил добавление контакта.")
+# @editor_router.callback_query(F.data == "confirm_yes_contact")
+# async def confirm_add_contact(callback_query: CallbackQuery, state: FSMContext):
+#     # Получаем данные из FSM
+#     data = await state.get_data()
+#     contact = data.get('contact_info')
+#     name, phone, email, position = contact
 
-    # Сообщение об отмене с эмодзи
-    await callback_query.message.edit_text("❌ Добавление контакта отменено.")
+#     # Загрузка существующих контактов
+#     contacts = fs.load_contacts()
 
-    # Отправляем меню действий
-    await callback_query.message.answer(
-        "🛠 Выберите действие (только для администраторов):",
-        reply_markup=edit_mashines
-    )
+#     # Добавляем новый контакт
+#     contacts.append({
+#         "name": name,
+#         "phone": phone,
+#         "email": email,
+#         "position": position
+#     })
+#     fs.save_contacts(contacts)
 
-    # Очищаем состояние FSM
-    await state.clear()
+#     # Логируем успешное добавление
+#     logger.info(
+#         f"✅ Пользователь {callback_query.from_user.id} добавил контакт: {name}, {phone}, {email}, {position}"
+#     )
 
-    # Закрываем спиннер callback
-    await callback_query.answer()
+#     # Очищаем состояние и возвращаем в главное меню
+#     await state.clear()
+#     await state.set_state(Register.main_menu)
 
+#     # Сообщение о результате с эмодзи
+#     await callback_query.message.edit_text(
+#         f"✅ Контакт успешно добавлен!\n\n"
+#         f"👤 ФИО: {name}\n"
+#         f"📞 Телефон: {phone}\n"
+#         f"✉️ Email: {email}\n"
+#         f"💼 Должность: {position}"
+#     )
 
-@editor_router.message(F.text == '🗑 Удалить контакт')
-async def delete_contact(message: Message, state: FSMContext):
-    await state.set_state(Register.delete_contact)
+#     await callback_query.message.answer(
+#         "🏠 Возврат в главное меню",
+#         reply_markup=main
+#     )
 
-    contacts = fs.load_contacts()
-    keyboard = fs.create_keyboard_contact(contacts)
-
-    if contacts:
-        await message.answer(
-            "🗑 Выберите контакт для удаления:",
-            reply_markup=keyboard
-        )
-    else:
-        await message.answer("ℹ️ Список контактов пуст, удалять нечего!")
-
-
-@editor_router.callback_query(F.data.startswith("contact_"))
-async def confirm_delete_contact(callback_query: CallbackQuery, state: FSMContext):
-    contact_id = callback_query.data.split('_')[1]
-    await state.update_data(contacts_id=contact_id)
-
-    contacts = fs.load_contacts()
-    for contact in contacts:
-        if contact['phone'] == contact_id:
-            await callback_query.message.edit_text(
-                f"❌ Вы уверены, что хотите удалить контакт:\n\n"
-                f"👤 {contact['name']}\n"
-                f"📞 {contact['phone']}\n"
-                f"✉️ {contact['email']}\n"
-                f"💼 {contact['position']}",
-                reply_markup=del_contact
-            )
-            break
-
-    # Закрываем спиннер callback
-    await callback_query.answer()
-    #         contacts.remove(contacts.index(i))
-    # save_contacts(contacts)
+#     # Закрываем спиннер callback
+#     await callback_query.answer()
 
 
-# Подтверждение удаления контакта
-@editor_router.callback_query(F.data == "confirm_delet_contact")
-async def confirm_deletes_contact(callback_query: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    contact_id = data.get('contacts_id')
-    contacts = fs.load_contacts()
+# @editor_router.callback_query(F.data == "confirm_no_contact")
+# async def cancel_add_contact(callback_query: CallbackQuery, state: FSMContext):
+#     logger.info(f"❌ Пользователь {callback_query.from_user.id} отменил добавление контакта.")
 
-    # Удаляем контакт по телефону
-    for i in contacts:
-        if i['phone'] == contact_id:
-            contacts.remove(i)
-            contact_name = i['name']
-            break
+#     # Сообщение об отмене с эмодзи
+#     await callback_query.message.edit_text("❌ Добавление контакта отменено.")
 
-    fs.save_contacts(contacts)
-    logger.info(f"🗑 Пользователь {callback_query.from_user.id} удалил контакт {contact_name} ({contact_id})")
+#     # Отправляем меню действий
+#     await callback_query.message.answer(
+#         "🛠 Выберите действие (только для администраторов):",
+#         reply_markup=edit_mashines
+#     )
 
-    # Сообщение об успешном удалении
-    await callback_query.message.edit_text(f"✅ Контакт {contact_name} удалён.")
+#     # Очищаем состояние FSM
+#     await state.clear()
 
-    # Отправляем меню действий
-    await callback_query.message.answer(
-        "🛠 Выберите действие (только для администраторов):",
-        reply_markup=edit_mashines
-    )
-
-    # Очищаем состояние FSM
-    await state.clear()
-    await callback_query.answer()  # Закрываем спиннер
+#     # Закрываем спиннер callback
+#     await callback_query.answer()
 
 
-# Отмена удаления контакта
-@editor_router.callback_query(F.data == "cancel_delet_contacts")
-async def cancel_delete(callback_query: CallbackQuery, state: FSMContext):
-    logger.info(f"❌ Пользователь {callback_query.from_user.id} отменил удаление контакта.")
+# @editor_router.message(F.text == '🗑 Удалить контакт')
+# async def delete_contact(message: Message, state: FSMContext):
+#     await state.set_state(Register.delete_contact)
 
-    # Сообщение об отмене
-    await callback_query.message.edit_text("❌ Удаление контакта отменено.")
+#     contacts = fs.load_contacts()
+#     keyboard = fs.create_keyboard_contact(contacts)
 
-    # Отправляем меню действий
-    await callback_query.message.answer(
-        "🛠 Выберите действие (только для администраторов):",
-        reply_markup=edit_mashines
-    )
+#     if contacts:
+#         await message.answer(
+#             "🗑 Выберите контакт для удаления:",
+#             reply_markup=keyboard
+#         )
+#     else:
+#         await message.answer("ℹ️ Список контактов пуст, удалять нечего!")
 
-    # Очищаем состояние FSM
-    await state.clear()
-    await callback_query.answer()  # Закрываем спиннер
+
+# @editor_router.callback_query(F.data.startswith("contact_"))
+# async def confirm_delete_contact(callback_query: CallbackQuery, state: FSMContext):
+#     contact_id = callback_query.data.split('_')[1]
+#     await state.update_data(contacts_id=contact_id)
+
+#     contacts = fs.load_contacts()
+#     for contact in contacts:
+#         if contact['phone'] == contact_id:
+#             await callback_query.message.edit_text(
+#                 f"❌ Вы уверены, что хотите удалить контакт:\n\n"
+#                 f"👤 {contact['name']}\n"
+#                 f"📞 {contact['phone']}\n"
+#                 f"✉️ {contact['email']}\n"
+#                 f"💼 {contact['position']}",
+#                 reply_markup=del_contact
+#             )
+#             break
+
+#     # Закрываем спиннер callback
+#     await callback_query.answer()
+#     #         contacts.remove(contacts.index(i))
+#     # save_contacts(contacts)
+
+
+# # Подтверждение удаления контакта
+# @editor_router.callback_query(F.data == "confirm_delet_contact")
+# async def confirm_deletes_contact(callback_query: CallbackQuery, state: FSMContext):
+#     data = await state.get_data()
+#     contact_id = data.get('contacts_id')
+#     contacts = fs.load_contacts()
+
+#     # Удаляем контакт по телефону
+#     for i in contacts:
+#         if i['phone'] == contact_id:
+#             contacts.remove(i)
+#             contact_name = i['name']
+#             break
+
+#     fs.save_contacts(contacts)
+#     logger.info(f"🗑 Пользователь {callback_query.from_user.id} удалил контакт {contact_name} ({contact_id})")
+
+#     # Сообщение об успешном удалении
+#     await callback_query.message.edit_text(f"✅ Контакт {contact_name} удалён.")
+
+#     # Отправляем меню действий
+#     await callback_query.message.answer(
+#         "🛠 Выберите действие (только для администраторов):",
+#         reply_markup=edit_mashines
+#     )
+
+#     # Очищаем состояние FSM
+#     await state.clear()
+#     await callback_query.answer()  # Закрываем спиннер
+
+
+# # Отмена удаления контакта
+# @editor_router.callback_query(F.data == "cancel_delet_contacts")
+# async def cancel_delete(callback_query: CallbackQuery, state: FSMContext):
+#     logger.info(f"❌ Пользователь {callback_query.from_user.id} отменил удаление контакта.")
+
+#     # Сообщение об отмене
+#     await callback_query.message.edit_text("❌ Удаление контакта отменено.")
+
+#     # Отправляем меню действий
+#     await callback_query.message.answer(
+#         "🛠 Выберите действие (только для администраторов):",
+#         reply_markup=edit_mashines
+#     )
+
+#     # Очищаем состояние FSM
+#     await state.clear()
+#     await callback_query.answer()  # Закрываем спиннер
 
 
 # Хендлер нажатия кнопки "Удал. руководство"
