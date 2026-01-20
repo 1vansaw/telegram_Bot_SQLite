@@ -25,10 +25,7 @@ async def set_main_menu(bot: Bot):
         BotCommand(command='/upload_excel',
                description='📊 Экспорт базы в Excel'),
         BotCommand(command='/check_access',
-                   description='🔒 Ваши данные'),
-        BotCommand(command='/contacts',
-                   description='📞 Контакты')
-    ]
+                   description='🔒 Ваши данные')]
 
     await bot.set_my_commands(main_menu_commands)
 
