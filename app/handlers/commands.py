@@ -127,25 +127,25 @@ async def send_photo(message: Message):
 
 
 # Обработка нажатия кнопки "Контакты"
-@commands_router.message(Command('contacts'))
-async def show_contacts(message: Message, state: FSMContext):
-    await state.clear()
-    data = fs.load_access_data()  # Загружаем данные о пользователях
-    user_id = message.from_user.id  # Получаем ID пользователя
-    # Определяем роль пользователя
-    role = fs.get_user_role(user_id, data)
-    if role in ["👑 Главный администратор!", "🛠 Администратор!", "👥 Пользователь"]:
-        contacts_info = "Вот наши контакты:\n"
-        contacts = fs.load_contacts()
-        for contact in contacts:
-            # Форматируем строку для вывода
-            contacts_info += f"👤 {contact['name']}\n💼 Должность: {contact['position']}\n📞 Телефон: {contact['phone']}\n✉️ Email: {contact['email']}\n"
-            contacts_info += "--------------------------------------\n"  # Добавляем разделитель
-        # Удаляем последний разделитель
-        contacts_info = contacts_info.rstrip("---------\n")
-        await message.answer(contacts_info)
-    else:
-        await message.answer("⛔ У вас нет доступа.")
+# @commands_router.message(Command('contacts'))
+# async def show_contacts(message: Message, state: FSMContext):
+#     await state.clear()
+#     data = fs.load_access_data()  # Загружаем данные о пользователях
+#     user_id = message.from_user.id  # Получаем ID пользователя
+#     # Определяем роль пользователя
+#     role = fs.get_user_role(user_id, data)
+#     if role in ["👑 Главный администратор!", "🛠 Администратор!", "👥 Пользователь"]:
+#         contacts_info = "Вот наши контакты:\n"
+#         contacts = fs.load_contacts()
+#         for contact in contacts:
+#             # Форматируем строку для вывода
+#             contacts_info += f"👤 {contact['name']}\n💼 Должность: {contact['position']}\n📞 Телефон: {contact['phone']}\n✉️ Email: {contact['email']}\n"
+#             contacts_info += "--------------------------------------\n"  # Добавляем разделитель
+#         # Удаляем последний разделитель
+#         contacts_info = contacts_info.rstrip("---------\n")
+#         await message.answer(contacts_info)
+#     else:
+#         await message.answer("⛔ У вас нет доступа.")
         
 
 @commands_router.message(Command("upload_excel"))
