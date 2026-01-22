@@ -37,7 +37,7 @@ async def historys(message: Message):
     )
 
     if not history:
-        await callback.message.edit_text(
+        await temp_message.edit_text(
             "📭 <b>История пуста</b>\n\n"
             "За последние <b>24 часа</b> записей не найдено.",
             parse_mode="HTML"
