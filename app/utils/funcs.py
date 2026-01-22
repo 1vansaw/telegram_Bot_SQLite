@@ -524,7 +524,7 @@ async def get_today_history():
         rows = await cursor.fetchall()
 
     if not rows:
-        return "За последние 24 часа записей не найдено."
+        return []
 
     messages = []
     for row in rows:
@@ -545,9 +545,8 @@ async def get_today_history():
         )
         messages.append(result_message)
 
-    separator = "\n---------------------------------------------\n"
-    return separator.join(messages)
-
+    #separator = "\n---------------------------------------------\n"
+    return messages
 
 async def load_db_data():
     """Загружает все записи из БД (асинхронно)."""
@@ -1218,3 +1217,25 @@ async def list_yadisk_backups():
             # Сортировка по дате создания (новые сверху)
             backups.sort(key=lambda x: x["created"], reverse=True)
             return backups
+
+def history_keyboard(page: int, total_pages: int) -> InlineKeyboardMarkup:
+    keyboard = []
+
+    nav = []
+    if page > 1:
+        nav.append(
+            InlineKeyboardButton(text="⬅️ Предыдущая", callback_data=f"history_page:{page - 1}")
+        )
+    if page < total_pages:
+        nav.append(
+            InlineKeyboardButton(text="Следующая ➡️", callback_data=f"history_page:{page + 1}")
+        )
+
+    if nav:
+        keyboard.append(nav)
+
+    keyboard.append([
+        InlineKeyboardButton(text="🔙 Главное меню", callback_data="main_menu")
+    ])
+
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
