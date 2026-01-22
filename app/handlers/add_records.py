@@ -630,7 +630,7 @@ async def confirm_save_data_fault_status(callback: types.CallbackQuery, state: F
             machine=selected_machine,
             inventory_number=inventory_number
         )
-        await callback.message.answer("✅ Данные успешно сохранены в базе!", reply_markup=inline_main_menu)
+        await callback.message.answer("✅ Данные успешно сохранены в базе!")
     except Exception as e:
         await callback.message.answer(f"Ошибка сохранения: {e}")
 
