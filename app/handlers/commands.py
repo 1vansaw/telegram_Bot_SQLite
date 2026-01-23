@@ -56,9 +56,15 @@ async def cmd_start(message: Message, state: FSMContext):
 @commands_router.message(Command('check_access'))
 async def get_access(message: Message, state: FSMContext):
     await state.clear()
+
+    user_id = message.from_user.id
+    user_name = message.from_user.full_name
+
+    logger.info(f"check_access вызван | user_id={user_id} | user_name={user_name}")
+
     data = fs.load_access_data()
-    user_id = message.from_user.id  # Получаем ID пользователя
     role = fs.get_user_role(user_id, data)
+
     if role == "👑 Главный администратор!":
         role_display = "👑 Главный администратор!"
         note = "Все функции доступны ✅"
@@ -71,9 +77,16 @@ async def get_access(message: Message, state: FSMContext):
     else:
         role_display = "⛔ Доступ отсутствует"
         note = "Свяжитесь с администратором для получения прав ❗"
+        logger.warning(
+            f"Пользователь без доступа | user_id={user_id} | user_name={user_name}"
+        )
+
+    logger.info(
+        f"Роль определена | user_id={user_id} | role={role_display}"
+    )
 
     await message.answer(
-        f"👤 Пользователь: {message.from_user.full_name}\n"
+        f"👤 Пользователь: {user_name}\n"
         f"🆔 Ваш ID: {user_id}\n"
         f"🔒 Уровень доступа: {role_display}\n\n"
         f"{note}"
