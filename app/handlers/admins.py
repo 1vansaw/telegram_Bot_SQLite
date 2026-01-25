@@ -60,14 +60,16 @@ async def backup_db_confirm_handler(callback: CallbackQuery):
             disk_msg = "⚠️ Не удалось загрузить на Яндекс.Диск."
 
         yadisk_count = await fs.count_yadisk_backups()
+        moscow_tz = pytz.timezone("Europe/Moscow")
+        moscow_time = datetime.now(tz=moscow_tz).strftime('%d.%m.%Y %H:%M')
 
         await callback.message.edit_text(
             f"✅ Резервная копия базы данных успешно создана!\n\n"
             f"📄 Файл: `{backup_filename}`\n"
             f"💾 Локальных копий: {current_count}/5\n"
-            f"☁️ Копий на Яндекс.Диске: {yadisk_count}\n\n"
+            f"☁️ Копий на Яндекс.Диске: {yadisk_count}/5\n\n"
             f"{disk_msg}\n\n"
-            f"🕒 Дата создания: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}",
+            f"🕒 Дата создания: {moscow_time}",
             parse_mode="HTML"
         )
 
