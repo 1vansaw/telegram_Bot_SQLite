@@ -416,11 +416,14 @@ async def create_backup():
         raise FileNotFoundError("Исходная база данных не найдена")
 
     os.makedirs(settings.DIR_DB, exist_ok=True)
-    timestamp = datetime.now().strftime("%d.%m.%Y_%H-%M-%S")
+
+    moscow_tz = pytz.timezone("Europe/Moscow")
+    timestamp = datetime.now(tz=moscow_tz).strftime("%d.%m.%Y_%H-%M")
+
     backup_filename = f"Копия_БД_{timestamp}.db"
     backup_path = os.path.join(settings.DIR_DB, backup_filename)
     shutil.copy2(settings.DB_FILE, backup_path)
-    
+
     # Ротация
     backup_files = [
         f for f in os.listdir(settings.DIR_DB)
@@ -433,7 +436,6 @@ async def create_backup():
             backup_files.pop(0)
 
     return backup_filename
-
 
 
 
