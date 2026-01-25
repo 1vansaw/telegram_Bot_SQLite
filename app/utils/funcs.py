@@ -395,20 +395,21 @@ async def create_backup():
         raise FileNotFoundError("Исходная база данных не найдена")
 
     os.makedirs(settings.DIR_DB, exist_ok=True)
-
+    timestamp = datetime.now().strftime("%d.%m.%Y_%H-%M-%S")
+    backup_filename = f"Копия_БД_{timestamp}.db"
+    backup_path = os.path.join(settings.DIR_DB, backup_filename)
+    shutil.copy2(settings.DB_FILE, backup_path)
+    
     # Ротация
     backup_files = [
         f for f in os.listdir(settings.DIR_DB)
         if f.startswith('Копия_БД_') and f.endswith('.db')
     ]
-    if len(backup_files) >= 5:
+    if len(backup_files) > 5:
         backup_files.sort(key=lambda x: os.path.getctime(os.path.join(settings.DIR_DB, x)))
-        os.remove(os.path.join(settings.DIR_DB, backup_files[0]))
-
-    timestamp = datetime.now().strftime("%d.%m.%Y_%H-%M-%S")
-    backup_filename = f"Копия_БД_{timestamp}.db"
-    backup_path = os.path.join(settings.DIR_DB, backup_filename)
-    shutil.copy2(settings.DB_FILE, backup_path)
+        while len(backup_files) > 5:
+            os.remove(os.path.join(settings.DIR_DB, backup_files[0]))
+            backup_files.pop(0)
 
     return backup_filename
 
