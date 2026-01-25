@@ -565,8 +565,6 @@ async def run_search(phrase):
 
 
 # # Функция создания PDF файла
-
-
 def create_pdf_file(results, filename):
     """Создает PDF файл с результатами поиска и возвращает путь к нему."""
     if not results:
@@ -608,6 +606,14 @@ def create_pdf_file(results, filename):
         '_', ' ') if len(filename.split('_')) > 2 else 'Запрос'
     title = Paragraph(f"Результаты поиска: '{search_phrase}'", title_style)
     elements.append(title)
+    
+    # --- Подсветка текста ---
+    def highlight_text(text, phrase):
+        if not phrase:
+            return str(text)
+        # Регистр-независимая замена
+        pattern = re.compile(re.escape(phrase), re.IGNORECASE)
+        return pattern.sub(lambda m: f"<font color='red'>{m.group(0)}</font>", str(text))
 
     # Преобразуем DataFrame в список списков с Paragraph для каждой ячейки
     data = []
@@ -615,6 +621,9 @@ def create_pdf_file(results, filename):
         data_row = []
         for cell in row:
             cell_text = str(cell) if cell is not None else ""
+            # Подсвечиваем только данные, не заголовки
+            if row != df.columns.tolist():
+                cell_text = highlight_text(cell_text, search_phrase)
             data_row.append(Paragraph(cell_text, normal_style))
         data.append(data_row)
 
