@@ -4,12 +4,13 @@ from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
 from aiogram.types import ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
 from app.states import Register
-from app.keyboards import inline_main_menu, main
+from app.keyboards import inline_main_menu
 import app.utils.funcs as fs
 import asyncio
 import logging
 from datetime import datetime
 from aiogram.types import FSInputFile
+from pathlib import Path
 
 
 search_router = Router()  # локальный роутер
@@ -96,11 +97,20 @@ async def process_search_phrase(message: Message, state: FSMContext):
         await progress_msg.delete()
 
         # Отправляем PDF
+        fs_file = FSInputFile(file_path)
         await message.answer_document(
-            document=FSInputFile(file_path),
+            document=fs_file,
             caption=f"По запросу '{phrase}' найдено {len(results)} результатов.",
             reply_markup=inline_main_menu
         )
+
+        # --- Удаляем временный файл через pathlib ---
+        try:
+            temp_file = Path(file_path)
+            if temp_file.exists():
+                temp_file.unlink()
+        except Exception as e:
+            logger.warning(f"Не удалось удалить временный PDF файл: {e}")
 
         await state.clear()
 
@@ -124,5 +134,3 @@ async def short_query_alert(callback: CallbackQuery):
         "Введите 3 или более символов для корректного поиска.",
         show_alert=True
     )
-
-
