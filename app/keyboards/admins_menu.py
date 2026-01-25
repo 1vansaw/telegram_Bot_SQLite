@@ -40,7 +40,7 @@ confirm_menu = ReplyKeyboardMarkup(
 
 source_keyboard = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="💾 Локальная копия", callback_data="restore_source_local")],
-    [InlineKeyboardButton(text="☁️ Яндекс.Диск", callback_data="restore_source_yadisk")],
+    [InlineKeyboardButton(text="☁️ Яндекс Диск", callback_data="restore_source_yadisk")],
     [InlineKeyboardButton(text="❌ Отмена", callback_data="restore_cancel")]
 ])
 
