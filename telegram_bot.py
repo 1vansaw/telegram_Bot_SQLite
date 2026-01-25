@@ -38,17 +38,17 @@ dp.include_router(router)
 
 
 # функция удаления файлов истории
-async def periodic_cleanup():
-    while True:
-        logging.info("Запуск периодической очистки...")
-        fs.cleanup_old_files()
-        await asyncio.sleep(settings.CLEANUP_INTERVAL)
+#async def periodic_cleanup():
+#    while True:
+#        logging.info("Запуск периодической очистки...")
+#        fs.cleanup_old_files()
+#        await asyncio.sleep(settings.CLEANUP_INTERVAL)
 
 
 async def main():
-    await fs.init_db()  # Инициализация базы данных SQLite
+    await fs.init_db(bot)  # Инициализация базы данных SQLite
     dp.startup.register(set_main_menu)
-    asyncio.create_task(periodic_cleanup())
+    #asyncio.create_task(periodic_cleanup())
     asyncio.create_task(fs.auto_backup_loop(bot))
     await dp.start_polling(bot)
     
