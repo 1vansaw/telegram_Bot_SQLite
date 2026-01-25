@@ -215,7 +215,12 @@ async def cancel_auto_backup_change(message: Message):
 @admin_router.message(F.text == '🔄 Восстановить БД из копии')
 async def restore_database_handler(message: Message, state: FSMContext):
     await state.clear()
-    await message.answer("Выберите источник резервной копии:", reply_markup=source_keyboard)
+    await message.answer(
+        "💾 <b>Восстановление базы данных</b>\n\n"
+        "⬇️ Пожалуйста, выберите источник резервной копии, чтобы продолжить",
+        reply_markup=source_keyboard,
+        parse_mode="HTML"
+    )
 
 
 # Обработчик выбора резервной копии
