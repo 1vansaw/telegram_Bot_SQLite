@@ -313,20 +313,30 @@ async def select_backup_handler(callback: CallbackQuery, state: FSMContext):
     await state.update_data(selected_file=selected, step='confirming_restore')
     await state.set_state(Register.confirming_restore)
 
-    file_time = selected["created"]
+    # корректное московское время
+    moscow_tz = pytz.timezone("Europe/Moscow")
+    created_utc = datetime.fromisoformat(selected["created"])
+    created_moscow = created_utc.astimezone(moscow_tz)
+    file_time = created_moscow.strftime("%d.%m.%Y %H:%M")
+
     confirm_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Подтвердить", callback_data="restore_confirm")],
         [InlineKeyboardButton(text="❌ Отмена", callback_data="restore_cancel")]
     ])
 
     await callback.message.edit_text(
-        f"⚠️ ВНИМАНИЕ!\n\n"
-        f"Вы собираетесь восстановить базу данных из копии:\n"
-        f"📄 {selected['name']}\n"
-        f"📅 {file_time}\n\n"
-        f"Текущие данные будут заменены. Это действие нельзя отменить!\n\n"
-        f"Подтвердите восстановление:",
-        reply_markup=confirm_keyboard
+        f"⚠️ <b>ВОССТАНОВЛЕНИЕ БД</b>\n"
+        f"{'•' * 30}\n"
+        f"Вы выбрали резервную копию:\n"
+        f"📄 <b>Файл:</b> <code>{selected['name']}</code>\n"
+        f"🕒 <b>Дата создания:</b> <code>{file_time}</code>\n"
+        f"{'•' * 30}\n"
+        f"❗ <b>ВАЖНО:</b>\n"
+        f"— Все текущие данные будут перезаписаны.\n"
+        f"— Откат после восстановления невозможен.\n\n"
+        f"⬇️ <b>Подтвердите выполнение операции:</b>",
+        reply_markup=confirm_keyboard,
+        parse_mode="HTML"
     )
     await callback.answer()
 
