@@ -226,29 +226,50 @@ def delete_admins_from_access(user_id):
     return False
 
 
-async def init_db():
+async def init_db(bot):
     """Инициализация базы данных и создание таблицы tasks со всеми колонками."""
-    async with aiosqlite.connect(settings.DB_FILE) as db:
-        # Создание таблицы со всеми колонками
-        await db.execute('''
-            CREATE TABLE IF NOT EXISTS tasks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                date TEXT NOT NULL,
-                workers TEXT NOT NULL,
-                machine TEXT NOT NULL,
-                shift TEXT NOT NULL,
-                start_time TEXT NOT NULL,
-                end_time TEXT,
-                work_description TEXT,
-                work_solution TEXT,
-                fault_status TEXT,
-                duration TEXT,
-                inventory_number TEXT
+    try:
+        async with aiosqlite.connect(settings.DB_FILE) as db:
+            # Создание таблицы со всеми колонками
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS tasks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    date TEXT NOT NULL,
+                    workers TEXT NOT NULL,
+                    machine TEXT NOT NULL,
+                    shift TEXT NOT NULL,
+                    start_time TEXT NOT NULL,
+                    end_time TEXT,
+                    work_description TEXT,
+                    work_solution TEXT,
+                    fault_status TEXT,
+                    duration TEXT,
+                    inventory_number TEXT
+                )
+            ''')
+            await db.commit()
+        logger.info("База данных инициализирована.")
+        access_data = load_access_data()
+        main_admins = access_data.get("main_admins", [])
+        main_admin_id = main_admins[0]
+        try:
+            await bot.send_message(
+                chat_id=main_admin_id,
+                text="✅ База данных успешно инициализирована!"
             )
-        ''')
-        await db.commit()
-    logger.info("База данных инициализирована.")
+        except Exception as e:
+            logger.error(f"Не удалось отправить сообщение главному администратору: {e}")
+    except Exception as e:
+        logger.error(f"Ошибка инициализации БД: {e}")
+        try:
+                await bot.send_message(
+                    chat_id=main_admins[0],
+                    text=f"❌ Ошибка при инициализации базы данных:\n\n<code>{e}</code>",
+                    parse_mode="HTML"
+                )
+        except Exception as send_error:
+            logger.error(f"Не удалось отправить сообщение админу: {send_error}")
     
     
 def cleanup_old_files():
