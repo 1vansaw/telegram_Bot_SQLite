@@ -11,6 +11,7 @@ from aiogram.fsm.context import FSMContext
 from app.config import settings
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove, FSInputFile
 from aiogram.filters import StateFilter
+import pytz
 
 
 admin_router = Router()  # <-- локальный роутер
@@ -186,11 +187,16 @@ async def confirm_auto_backup_change(message: Message):
 
     setting["interval"] = new_interval
     setting["enabled"] = (new_interval != "off")
+    
+    notify_text = ""
+    if new_interval == "off" and setting.get("notify", True):
+        setting["notify"] = False
+        notify_text = "🔕 Уведомления об автокопировании отключены."
 
     fs.save_auto_backup_settings(setting)
 
     if new_interval == "off":
-        text = "🔴 Автокопирование отключено."
+        text = f"🔴 Автокопирование отключено.\n{notify_text}"
     else:
         text = f"🟢 Автокопирование включено: **{settings.INTERVAL_NAMES[new_interval]}**."
 
@@ -241,38 +247,52 @@ async def select_restore_source(callback: CallbackQuery, state: FSMContext):
             if f.startswith('Копия_БД_') and f.endswith('.db')
         ]
         
-        if not files:  # Если нет локальных копий
+        if not files:
             await callback.message.edit_text("❌ Резервные копии не найдены в папке!")
             return
 
         files.sort(key=lambda x: os.path.getctime(os.path.join(settings.DIR_DB, x)), reverse=True)
         files = files[:5]  # Ограничиваем 5 последними
-        # Формируем список словарей для единообразия
-        backup_files = [{"name": f, "created": datetime.fromtimestamp(os.path.getctime(os.path.join(settings.DIR_DB, f))).strftime("%d.%m.%Y %H:%M")} for f in files]
+        backup_files = []
+        for f in files:
+            created_ts = os.path.getctime(os.path.join(settings.DIR_DB, f))
+            created_utc = datetime.fromtimestamp(created_ts, tz=pytz.UTC)
+            backup_files.append({"name": f, "created": created_utc.isoformat()})
 
     else:  # yadisk
-        # Показываем сообщение о подготовке файлов
-        status_message = await callback.message.edit_text("⏳ Подготавливаю файлы с Яндекс.Диска...")
+        status_message = await callback.message.edit_text("⏳ Подготавливаю файлы с Яндекс Диска...")
 
         backup_files_data = await fs.list_yadisk_backups()
         if not backup_files_data:
             await status_message.edit_text("❌ Резервные копии на Яндекс Диске не найдены!")
             return
-        backup_files = backup_files_data  # Ожидаем [{"name": "Копия_БД_01.db", "created": "2026-01-17 12:00"}]
+        backup_files = backup_files_data  # [{"name": "Копия_БД_01.db", "created": "2026-01-17T12:00:00+00:00"}]
 
-    # Клавиатура для выбора копии
-    keyboard = [
-        [InlineKeyboardButton(
-            text=f"#{i+1} 🕒 {b['created']}",
-            callback_data=f"restore_select_{i}"
-        )] for i, b in enumerate(backup_files)
-    ]
+    moscow_tz = pytz.timezone("Europe/Moscow")
+    keyboard = []
+
+    for i, b in enumerate(backup_files):
+        # Парсим дату из ISO-формата (локальные и Yandex)
+        created_utc = datetime.fromisoformat(b['created'])
+        # Переводим в московское время
+        created_moscow = created_utc.astimezone(moscow_tz)
+        formatted_time = created_moscow.strftime("%d.%m.%Y %H:%M")
+
+        keyboard.append([
+            InlineKeyboardButton(
+                text=f"📁 Копия №{i+1} от {formatted_time}",
+                callback_data=f"restore_select_{i}"
+            )
+        ])
+
     keyboard.append([InlineKeyboardButton(text="❌ Отмена", callback_data="restore_cancel")])
     markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
 
     await state.update_data(restore_files=backup_files)
     await state.set_state(Register.choosing_backup)
     await callback.message.edit_text("📋 Выберите резервную копию для восстановления:", reply_markup=markup)
+
+
 
 
 
