@@ -324,7 +324,7 @@ async def auto_backup_loop(bot):
                                 f"🟢 Автокопирование завершено!\n\n"
                                 f"📄 Файл: `{filename}`\n"
                                 f"💾 Локальных копий: {len([f for f in os.listdir(settings.DIR_DB) if f.startswith('Копия_БД_') and f.endswith('.db')])}/5\n"
-                                f"☁️ Копий на Яндекс.Диске: {yadisk_count}\n"
+                                f"☁️ Копий на Яндекс.Диске: {yadisk_count}/5\n"
                                 f"{disk_msg}\n"
                                 f"🕒 Дата создания: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}",
                                 parse_mode="HTML"
