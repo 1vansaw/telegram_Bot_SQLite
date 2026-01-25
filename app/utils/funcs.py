@@ -534,6 +534,7 @@ async def get_today_history():
         id_, date, workers, work_description, work_solution, fault_status, start_time, end_time, duration, shift, machine, inventory_number = row
 
         result_message = (
+            f"🚀 <b>ЗАЯВКА</b> <code>#{id_}</code>\n"
             f"📅 <b>Дата:</b> {date}\n"
             f"📌 <b>Исполнители работ:</b> {workers}\n"
             f"📝 <b>Описание проблемы:</b> {work_description}\n"
