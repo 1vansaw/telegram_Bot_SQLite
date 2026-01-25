@@ -23,6 +23,7 @@ from pathlib import Path
 from math import ceil
 import aiohttp
 import aiofiles
+import pytz
 
 
 
@@ -314,6 +315,8 @@ async def auto_backup_loop(bot):
 
                     access_data = load_access_data()
                     main_admins = access_data.get("main_admins", [])
+                    moscow_tz = pytz.timezone("Europe/Moscow")
+                    moscow_time = datetime.now(tz=moscow_tz).strftime('%d.%m.%Y %H:%M')
 
                     logger.info(f"Автокопирование: создана локальная копия {filename} | {disk_msg}")
 
@@ -326,7 +329,7 @@ async def auto_backup_loop(bot):
                                 f"💾 Локальных копий: {len([f for f in os.listdir(settings.DIR_DB) if f.startswith('Копия_БД_') and f.endswith('.db')])}/5\n"
                                 f"☁️ Копий на Яндекс.Диске: {yadisk_count}/5\n"
                                 f"{disk_msg}\n"
-                                f"🕒 Дата создания: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}",
+                                f"🕒 Дата создания: {moscow_time}",
                                 parse_mode="HTML"
                             )
                         except Exception as e:
