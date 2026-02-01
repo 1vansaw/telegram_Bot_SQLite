@@ -707,21 +707,60 @@ def save_contacts(contacts):
         json.dump(contacts, file, ensure_ascii=False, indent=4)
 
 
-def create_keyboard_contact(machine_list):
+def create_keyboard(machine_list, page: int = 0):
     buttons = []
-    for i in range(0, len(machine_list), 2):
-        row = []
-        # Добавляем первую кнопку в ряд
-        row.append(InlineKeyboardButton(
-            text=machine_list[i]['name'], callback_data=f"contact_{machine_list[i]['phone']}"))
-        # Проверяем, есть ли следующая кнопка
-        if i + 1 < len(machine_list):
-            row.append(InlineKeyboardButton(
-                text=machine_list[i + 1]['name'], callback_data=f"contact_{machine_list[i + 1]['phone']}"))
-        else:
-            # Если следующей кнопки нет, добавляем пустую кнопку
-            row.append(InlineKeyboardButton(text=" ", callback_data="ignore"))
-        buttons.append(row)
+
+    start = page * settings.ITEMS_PER_PAGE
+    end = start + settings.ITEMS_PER_PAGE
+    page_items = machine_list[start:end]
+
+    # кнопки станков (по 2 в ряд)
+    i = 0
+    while i < len(page_items):
+        # если остался один последний — делаем на всю ширину
+        if i == len(page_items) - 1:
+            buttons.append([
+                InlineKeyboardButton(
+                    text=page_items[i]['name'],
+                    callback_data=page_items[i]['name']
+                )
+            ])
+            break
+
+        buttons.append([
+            InlineKeyboardButton(
+                text=page_items[i]['name'],
+                callback_data=page_items[i]['name']
+            ),
+            InlineKeyboardButton(
+                text=page_items[i + 1]['name'],
+                callback_data=page_items[i + 1]['name']
+            )
+        ])
+        i += 2
+
+    # ==== пагинация (только если станков больше лимита) ====
+    if len(machine_list) > settings.ITEMS_PER_PAGE:
+        nav_row = []
+
+        if page > 0:
+            nav_row.append(
+                InlineKeyboardButton(text="⬅️ Предыдущая", callback_data=f"page_{page-1}")
+            )
+
+        if end < len(machine_list):
+            nav_row.append(
+                InlineKeyboardButton(text="➡️ Следующая", callback_data=f"page_{page+1}")
+            )
+
+        if nav_row:
+            buttons.append(nav_row)
+
+    # кнопка Назад
+    buttons.append([
+        InlineKeyboardButton(text=" ↩️ Назад", callback_data='back_2')
+    ])
+
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
