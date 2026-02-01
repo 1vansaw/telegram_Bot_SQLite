@@ -6,14 +6,14 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram_calendar import SimpleCalendar, SimpleCalendarCallback, get_user_locale
 from app.states import Register
 import logging
-from app.keyboards import workshops, del_machines, markup, inline_main_menu
+from app.keyboards import del_machines, markup, inline_main_menu, workshops
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from datetime import datetime
 import app.utils.funcs as fs
 from datetime import datetime, time
 from app.data_shops import shops
-import asyncio
-
+import math
+from app.config import settings
 
 add_router = Router()
 logger = logging.getLogger(__name__)
@@ -27,10 +27,8 @@ async def add_record(message: Message, state: FSMContext):
     role = fs.get_user_role(user_id, data)
     if role in ["👑 Главный администратор!", "🛠 Администратор!", "👥 Пользователь"]:
         await state.set_state(Register.shop_selection)
-        #temp_msg = await message.answer("⌛ Подготавливаю список цехов...",reply_markup=ReplyKeyboardRemove())
-        #await asyncio.sleep(0.6)
-        #await temp_msg.delete()
         await message.answer('🏭 Выберите цех', reply_markup=workshops)
+        logger.info(f"Пользователь {user_id} ({message.from_user.full_name}) начал добавление записи.")
     else:
         await message.answer('⛔ У вас нет доступа')
         
@@ -38,38 +36,80 @@ async def add_record(message: Message, state: FSMContext):
 # функция формирования кнопок из файла json в зависимости от состояния
 @add_router.callback_query(F.data.regexp(r'(.+?)-shop'))
 async def shops_1(callback: CallbackQuery, state: FSMContext):
+    page = 0
     # Извлекаем номер цеха из данных колбэка
     # Получаем номер или название цеха
     shop_number = callback.data.split('-')[0]
     machines_data = fs.load_machines_data()
     machines = machines_data.get(f'maschines_{shop_number}', [])
+    total_pages = math.ceil(len(machines) / settings.ITEMS_PER_PAGE)
     # Обновляем состояние пользователя
     await state.update_data(selected_shop=callback.data)
     logger.info(
-        f"Пользователь {callback.from_user.id} выбрал цех {shop_number}.")
+        f"Пользователь {callback.from_user.id} ({callback.from_user.full_name}) выбрал цех {shop_number}.")
     if await state.get_state() == Register.shop_selection.state:
         # Устанавливаем состояние в зависимости от номера цеха
         await state.set_state(getattr(Register, f'machine_selection_{shop_number}'))
         # Генерируем клавиатуру с станками
-        keyboard = fs.create_keyboard(machines)
-        await callback.message.edit_text("⚙️ Выберите станок:", reply_markup=keyboard)
+        keyboard = fs.create_keyboard(machines, page=0)
+        
+        await callback.message.edit_text(
+            f"⚙️ <b>ВЫБЕРИТЕ СТАНОК</b>\n"
+            f"📱 <b>СТРАНИЦА:</b> <code>{page+1}/{total_pages}</code>\n"
+            f"{'•' * 30}",
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
     elif await state.get_state() == Register.awaiting_machine_name.state:
         await callback.message.edit_text("✏️ Введите название станка:")
         await state.set_state(Register.awaiting_machine_name)
     elif await state.get_state() == Register.delete_machine.state:
         # Устанавливаем состояние в зависимости от номера цеха
         await state.set_state(getattr(Register, f'machine_selection_{shop_number}'))
-        keyboard = fs.create_keyboard(machines)
-        await callback.message.edit_text("🗑 Выберите станок для удаления:", reply_markup=keyboard)
+        keyboard = fs.create_keyboard(machines, page=0)
+        await callback.message.edit_text(
+            f"⚙️ <b>ВЫБЕРИТЕ СТАНОК</b>\n"
+            f"📱 <b>СТРАНИЦА:</b> <code>1/{total_pages}</code>\n"
+            f"{'•' * 30}",
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
         await state.set_state(Register.delete_machine_1)
 
 
+
+@add_router.callback_query(F.data.startswith("page_"))
+async def paginate_machines(callback: CallbackQuery, state: FSMContext):
+    page = int(callback.data.split("_")[1])
+
+    data = await state.get_data()
+    selected_shop = data.get("selected_shop")
+    shop_number = selected_shop.split("-")[0]
+    logger.info(f"Пользователь {callback.from_user.id} ({callback.from_user.full_name}) листает страницу станков: {page+1}")
+
+    machines_data = fs.load_machines_data()
+    machines = machines_data.get(f'maschines_{shop_number}', [])
+
+    keyboard = fs.create_keyboard(machines, page=page)
+
+    total_pages = math.ceil(len(machines) / settings.ITEMS_PER_PAGE)
+
+    await callback.message.edit_text(
+        f"⚙️ <b>ВЫБЕРИТЕ СТАНОК</b>\n"
+        f"📱 <b>СТРАНИЦА:</b> <code>{page+1}/{total_pages}</code>\n"
+        f"{'•' * 30}",
+        reply_markup=keyboard,
+        parse_mode="HTML"
+    )
+
+    await callback.answer()
 
 
 # функция для работы после выбора станка в зависимости от состояния
 @add_router.callback_query(lambda callback: any(machine['name'] in callback.data for machines in fs.load_machines_data().values() for machine in machines))
 async def reg(callback: CallbackQuery, state: FSMContext):
     await state.update_data(selected_machine=callback.data)
+    logger.info(f"Пользователь {callback.from_user.id} ({callback.from_user.full_name}) выбрал станок {callback.data}")
     if await state.get_state() == Register.delete_machine_1.state:
         user_data = await state.get_data()
         shop_number = user_data.get('selected_shop').split('-')[0]
@@ -89,7 +129,7 @@ async def reg(callback: CallbackQuery, state: FSMContext):
             await state.update_data(machine_to_remove=machine_to_remove)
         else:
             logger.warning(
-                f"Пользователь {callback.from_user.id} выбрал несуществующий станок '{machine_name}' в цехе {shop_number}.")
+                f"Пользователь {callback.from_user.id} ({callback.from_user.full_name}) выбрал несуществующий станок '{machine_name}' в цехе {shop_number}.")
             await callback.answer("❌ Станок не найден.")
     else:
         # Сохраняем текущее состояние перед переходом к новому
@@ -108,7 +148,7 @@ async def reg(callback: CallbackQuery, state: FSMContext):
 @add_router.callback_query(SimpleCalendarCallback.filter())
 async def process_simple_calendar(callback_query: CallbackQuery, callback_data: CallbackData, state: FSMContext):
     logger.info(
-        f"Пользователь {callback_query.from_user.id} взаимодействует с календарем.")
+        f"Пользователь {callback_query.from_user.id} ({callback_query.from_user.full_name}) взаимодействует с календарем.")
     calendar = SimpleCalendar(
         locale=await get_user_locale(callback_query.from_user),
         show_alerts=True)
@@ -127,7 +167,7 @@ async def process_simple_calendar(callback_query: CallbackQuery, callback_data: 
                 await callback_query.message.edit_text(f'📅 Выбрать дату {selected_date_start.strftime("%d.%m.%Y")}?', reply_markup=markup)
                 await state.set_state(Register.date_end)
                 logger.info(
-                    f"Пользователь {callback_query.from_user.id} выбрал дату начала: {selected_date_start.strftime('%d.%m.%Y')}.")
+                    f"Пользователь {callback_query.from_user.id} ({callback_query.from_user.full_name}) выбрал дату начала: {selected_date_start.strftime('%d.%m.%Y')}.")
             elif await state.get_state() == Register.confirm_dates.state:
                 await state.update_data(selected_date_end=date)
                 await callback_query.message.edit_text(
@@ -142,7 +182,7 @@ async def process_simple_calendar(callback_query: CallbackQuery, callback_data: 
 # привязка к кнопке назад
 @add_router.callback_query(F.data == "back_to_calendar")
 async def back_to_calendar(callback: CallbackQuery, state: FSMContext):
-    logger.info(f"Пользователь {callback.from_user.id} вернулся к календарю.")
+    logger.info(f"Пользователь {callback.from_user.id} ({callback.from_user.full_name}) вернулся к календарю.")
     current_state = await state.get_state()
     user_data = await state.get_data()
     if current_state == Register.today_date.state or current_state == Register.date_end.state:
@@ -170,12 +210,12 @@ async def confirm_date(callback: CallbackQuery, state: FSMContext):
         # Устанавливаем состояние на выбор даты окончания
         await state.set_state(Register.confirm_dates)
         logger.info(
-            f"Пользователь {callback.from_user.id} подтвердил дату начала и перешел к выбору даты окончания.")
+            f"Пользователь {callback.from_user.id} ({callback.from_user.full_name}) подтвердил дату начала и перешел к выбору даты окончания.")
     elif current_state == Register.confirm_dates.state:
         data = await state.get_data()
         if data.get("selected_date_end").date() < data.get("selected_date_start").date():
             logger.warning(
-                f"Пользователь {callback.from_user.id} выбрал некорректную дату окончания (раньше начала).")
+                f"Пользователь {callback.from_user.id} ({callback.from_user.full_name}) выбрал некорректную дату окончания (раньше начала).")
             await callback.message.edit_text(
                 f'❌ Дата завершения должна быть больше или равна дате начала. 📅 Пожалуйста, выберите другую дату (дата начала: {data.get("selected_date_start").strftime("%d.%m.%Y")}).',
                 reply_markup=await SimpleCalendar(locale=await get_user_locale(callback.from_user)).start_calendar())
@@ -183,7 +223,7 @@ async def confirm_date(callback: CallbackQuery, state: FSMContext):
             # Устанавливаем состояние
             await state.set_state(Register.date_to_time)
             logger.info(
-                f"Пользователь {callback.from_user.id} подтвердил даты: начало {data.get('selected_date_start').strftime('%d.%m.%Y')}, окончание {data.get('selected_date_end').strftime('%d.%m.%Y')}.")
+                f"Пользователь {callback.from_user.id} ({callback.from_user.full_name}) подтвердил даты: начало {data.get('selected_date_start').strftime('%d.%m.%Y')}, окончание {data.get('selected_date_end').strftime('%d.%m.%Y')}.")
             # ✅ Отправляем сообщение сразу, чтобы вызвать `start_cmd`
             await start_cmd(callback.message, state)
             
@@ -229,6 +269,7 @@ async def start_cmd(message: Message, state: FSMContext):
 
 @add_router.callback_query(F.data.startswith('hourstart_'))
 async def enter_hours_start(callback: types.CallbackQuery, state: FSMContext):
+    logger.info(f"Пользователь {callback.from_user.id} ({callback.from_user.full_name}) вводит часы начала")
     action = callback.data.split("_")[1]
     data = await state.get_data()
     hours_start = data.get("hours_start", "")
@@ -348,6 +389,7 @@ def confirm_cancel_keyboard(confirm_data, cancel_data):
 
 @add_router.callback_query(F.data.startswith('hourend_'))
 async def enter_hours_end(callback: types.CallbackQuery, state: FSMContext):
+    logger.info(f"Пользователь {callback.from_user.id} ({callback.from_user.full_name}) вводит часы окончания")
     action = callback.data.split("_")[1]
     data = await state.get_data()
     hours_end = data.get("hours_end", "")
@@ -423,6 +465,7 @@ async def enter_hours_end(callback: types.CallbackQuery, state: FSMContext):
 # Шаг 1: Ввод исполнителей работ
 @add_router.message(Register.personal)
 async def save_workers(message: Message, state: FSMContext):
+    logger.info(f"Пользователь {message.from_user.id} ({message.from_user.full_name}) вводит исполнителей работ")
     workers_input = message.text.strip()
     if not workers_input:
         await message.answer("❗ Пожалуйста, введите хотя бы одного исполнителя.")
@@ -460,6 +503,7 @@ async def cancel_workers(callback: CallbackQuery, state: FSMContext):
 # Шаг 2: Описание проблемы
 @add_router.message(Register.working)
 async def save_work_description(message: Message, state: FSMContext):
+    logger.info(f"Пользователь {message.from_user.id} ({message.from_user.full_name}) вводит описание проблемы")
     text = message.text.strip()
     if not text:
         await message.answer("❗ Пожалуйста, введите описание проблемы.")
@@ -502,6 +546,7 @@ def get_inventory_number(item_name, items):
 # Шаг 3: Решение проблемы
 @add_router.message(Register.working_solution)
 async def save_work_solution(message: Message, state: FSMContext):
+    logger.info(f"Пользователь {message.from_user.id} ({message.from_user.full_name}) вводит решение проблемы")
     text = message.text.strip()
     if not text:
         await message.answer("❗ Пожалуйста, введите решение проблемы.")
@@ -538,6 +583,7 @@ async def cancel_solution(callback: CallbackQuery, state: FSMContext):
 
 @add_router.message(Register.fault_status)
 async def save_fault_status(message: Message, state: FSMContext):
+    logger.info(f"Пользователь {message.from_user.id} ({message.from_user.full_name}) вводит статус неисправности")
     fault_status = message.text.strip()
     if not fault_status:  # Валидация: не пустой и не только пробелы
         await message.answer("❗ Пожалуйста, введите статус неисправности (не пустой и без лишних пробелов).")
@@ -555,6 +601,7 @@ async def save_fault_status(message: Message, state: FSMContext):
 
 @add_router.callback_query(F.data == "save_data_fault_status")
 async def confirm_save_data_fault_status(callback: types.CallbackQuery, state: FSMContext):
+    logger.info(f"Пользователь {callback.from_user.id} ({callback.from_user.full_name}) подтвердил сохранение данных")
     data = await state.get_data()
 
     workers = data.get('workers', [])
