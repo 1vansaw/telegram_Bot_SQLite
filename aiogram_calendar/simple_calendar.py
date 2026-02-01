@@ -9,7 +9,11 @@ from .common import GenericCalendar, get_user_locale
 import app.keyboards as kb
 from aiogram.fsm.context import FSMContext
 from app.states import Register
-from app.utils.funcs import load_machines_data
+import os
+import json
+import math
+from app.config import settings
+import app.utils.funcs as fs
 
 
 class SimpleCalendar(GenericCalendar):
@@ -185,42 +189,51 @@ class SimpleCalendar(GenericCalendar):
                     locale=await get_user_locale(query.from_user)).start_calendar())
             await state.set_state(Register.date_start)
         else:
-            shops_1 = creates_keyboard(load_machines_data()['maschines_1'])
-            shops_2 = creates_keyboard(load_machines_data()['maschines_2'])
-            shops_3 = creates_keyboard(load_machines_data()['maschines_3'])
-            shops_11 = creates_keyboard(load_machines_data()['maschines_11'])
-            shops_15 = creates_keyboard(load_machines_data()['maschines_15'])
-            shops_17 = creates_keyboard(load_machines_data()['maschines_17'])
-            shops_20 = creates_keyboard(load_machines_data()['maschines_20'])
-            shops_26 = creates_keyboard(load_machines_data()['maschines_26'])
-            shops_kmt = creates_keyboard(load_machines_data()['maschines_kmt'])
+            machines_data = fs.load_machines_data()
             previous_data = await state.get_data()
             previous_state = previous_data.get('previous_state')
             await state.set_state(previous_state)
+
+            # Выбираем список станков в зависимости от состояния
             if previous_state == Register.machine_selection_1.state:
-                await query.message.edit_text('Выберите станок', reply_markup=shops_1)
+                machines = machines_data['maschines_1']
             elif previous_state == Register.machine_selection_2.state:
-                await query.message.edit_text('Выберите станок', reply_markup=shops_2)
+                machines = machines_data['maschines_2']
             elif previous_state == Register.machine_selection_3.state:
-                await query.message.edit_text('Выберите станок', reply_markup=shops_3)
+                machines = machines_data['maschines_3']
             elif previous_state == Register.machine_selection_11.state:
-                await query.message.edit_text('Выберите станок', reply_markup=shops_11)
+                machines = machines_data['maschines_11']
             elif previous_state == Register.machine_selection_15.state:
-                await query.message.edit_text('Выберите станок', reply_markup=shops_15)
+                machines = machines_data['maschines_15']
             elif previous_state == Register.machine_selection_17.state:
-                await query.message.edit_text('Выберите станок', reply_markup=shops_17)
+                machines = machines_data['maschines_17']
             elif previous_state == Register.machine_selection_20.state:
-                await query.message.edit_text('Выберите станок', reply_markup=shops_20)
+                machines = machines_data['maschines_20']
             elif previous_state == Register.machine_selection_26.state:
-                await query.message.edit_text('Выберите станок', reply_markup=shops_26)
+                machines = machines_data['maschines_26']
             elif previous_state == Register.machine_selection_kmt.state:
-                await query.message.edit_text('Выберите станок', reply_markup=shops_kmt)
+                machines = machines_data['maschines_kmt']
+            else:
+                machines = []
+
+            # Генерируем клавиатуру с пагинацией (первая страница)
+            keyboard = fs.create_keyboard(machines, page=0)
+
+            # Формируем текст с номером страницы
+            total_pages = math.ceil(len(machines) / settings.ITEMS_PER_PAGE)
+            msg_text = (
+                f"⚙️ <b>ВЫБЕРИТЕ СТАНОК</b>\n"
+                f"📱 <b>СТРАНИЦА:</b> <code>1/{total_pages}</code>\n"
+                f"{'•' * 30}"
+            )
+
+            await query.message.edit_text(msg_text, reply_markup=keyboard, parse_mode="HTML")
 
     async def today_button(self, query: CallbackQuery, state: FSMContext):
         current_state = await state.get_state()
         if current_state == Register.confirm_dates.state:
             await query.message.edit_text(
-                f'📅 Вы выбрали дату завершения: {datetime.now().strftime("%d.%m.%Y")}. Подтвердите выбор? ✅ ',
+                f'📅 Вы выбрали дату завершения: {datetime.now().strftime("%d.%m.%Y")}. Подтвердите выбор ✅ ?',
                 reply_markup=kb.markup)
             await state.update_data(selected_date_end=datetime.now())
         else:
