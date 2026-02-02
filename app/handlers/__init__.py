@@ -6,6 +6,7 @@ from .history import history_router
 from .edit_records import edit_router
 from .search import search_router
 from .commands import commands_router
+from .electro import electroschemes_router
 from aiogram import Router
 
 router = Router()
@@ -18,4 +19,5 @@ router.include_router(history_router)    # ✅ Точное состояние +
 
 router.include_router(editor_router)     # ✅ ДО admin_router!
 router.include_router(manuals_router)    # ✅ ДО admin_router!
+router.include_router(electroschemes_router)
 router.include_router(admin_router)
