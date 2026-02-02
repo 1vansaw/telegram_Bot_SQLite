@@ -16,7 +16,7 @@ import uuid
 electroschemes_router = Router(name=__name__)
 logger = logging.getLogger(__name__)
 
-PER_PAGE = 6  # Количество файлов на странице
+
 
 @electroschemes_router.message(F.text == "⚡ Электросхемы")
 async def open_electroschemes_menu(message: Message):
@@ -53,8 +53,8 @@ async def handle_shop_choice(query: CallbackQuery):
     files = await fs.list_yadisk_electroschemes(shop)
 
     page = 1
-    total_pages = max(1, ceil(len(files) / PER_PAGE))
-    keyboard = fs.build_schemes_keyboard(files, shop, page=page, per_page=PER_PAGE)
+    total_pages = max(1, ceil(len(files) / settings.PER_PAGE))
+    keyboard = fs.build_schemes_keyboard(files, shop, page=page, per_page=settings.PER_PAGE)
 
     # Красивое оформление текста
     if not files:
@@ -87,10 +87,10 @@ async def handle_navigation(query: CallbackQuery):
     _, shop, page_str = query.data.split(":")
     page = int(page_str)
     files = await fs.list_yadisk_electroschemes(shop)
-    total_pages = max(1, ceil(len(files)/PER_PAGE))
+    total_pages = max(1, ceil(len(files)/settings.PER_PAGE))
     page = max(1, min(page, total_pages))  # защита от выхода за пределы
 
-    keyboard = fs.build_schemes_keyboard(files, shop, page=page, per_page=PER_PAGE)
+    keyboard = fs.build_schemes_keyboard(files, shop, page=page, per_page=settings.PER_PAGE)
 
     await query.message.edit_text(
         f"📂 Схемы цеха {shop}\nСтраница {page}/{total_pages}",
