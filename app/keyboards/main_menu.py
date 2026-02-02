@@ -6,12 +6,15 @@ main = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text='📝 Добавить запись'),
          KeyboardButton(text='📜 История за сутки')],
+
         [KeyboardButton(text='✏️ Изменить запись'),
          KeyboardButton(text='🔍 Поиск записи')],
-        [KeyboardButton(text='🛠️ Редактор'),          
-         KeyboardButton(text='👑 Админ меню')],        
-        # [KeyboardButton(text='🧹 Очистить чат')]
-        [KeyboardButton(text='📚 Руководства')]
+
+        [KeyboardButton(text='🛠️ Редактор'),
+         KeyboardButton(text='👑 Админ меню')],
+
+        [KeyboardButton(text='📚 Руководства'),
+         KeyboardButton(text='⚡ Электросхемы')]
     ],
     resize_keyboard=True,
     input_field_placeholder='Выберите пункт'
