@@ -4,19 +4,26 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from app.states import Register
 import logging
-from app.keyboards import edit_mashines, main, confirm_edit_mashines, workshops, confirm_edit_users, del_users, del_contact, add_contact, inline_main_menu
+from app.keyboards import edit_mashines, main, confirm_edit_mashines, confirm_edit_users, del_users, inline_main_menu, workshops
 import app.utils.funcs as fs
-import re
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 import os
 from app.config import settings
 from pathlib import Path
+import aiofiles
+import aiohttp
+import time
+import ssl
+import certifi
+
 
 editor_router = Router()
 logger = logging.getLogger(__name__)
 
 # Загружаем данные при старте
 machines_data = fs.load_machines_data()
+
+CHUNK_SIZE = 512 * 1024  # 512 KB за раз
 
 
 @editor_router.message(F.text == '🛠️ Редактор')
@@ -798,52 +805,111 @@ async def receive_manual(message: Message, state: FSMContext):
     
 @editor_router.callback_query(lambda c: c.data == "manual_add_yes", Register.confirm_upload)
 async def manual_add_execute(callback: CallbackQuery, state: FSMContext):
+
+    user_id = callback.from_user.id
+    user_name = callback.from_user.full_name
+
     data = await state.get_data()
     document = data.get("file")
     filename = data.get("filename")
 
     if not document:
-        await callback.message.edit_text("❌ Файл не найден. Пожалуйста, отправьте его снова.")
+        await callback.message.edit_text(
+            "❌ Файл не найден. Пожалуйста, отправьте его снова.",
+            reply_markup=inline_main_menu
+        )
         await state.clear()
         return
 
-    # Создаём путь
     filepath = os.path.join(settings.MANUALS_DIR, filename)
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
-    # Проверка на существующий файл
     if os.path.exists(filepath):
         await callback.message.edit_text(
-            f"⚠️ <b>Файл {filename} уже существует!</b>\n"
+            f"⚠️ <b>Файл {filename}</b> уже существует!\n"
             "❌ Загрузка отменена, выберите другой файл или выйдите в главное меню",
-            parse_mode="HTML", reply_markup=inline_main_menu
+            parse_mode="HTML",
+            reply_markup=inline_main_menu
         )
-        # возвращаем FSM в состояние ожидания файла
         await state.set_state(Register.waiting_file)
-        #await state.clear()
         return
 
-    # Сразу удаляем кнопки и показываем, что загрузка началась
-    loading_message = await callback.message.edit_text(
-        f"⏳ <b>Загрузка руководства:</b> <i>{filename}</i> началась...",
+    size_mb = document.file_size / (1024 * 1024)
+    if size_mb > 45:
+        await callback.message.edit_text(
+            f"❌ Файл слишком большой ({size_mb:.1f} МБ). "
+            "Telegram не позволит загрузить файл больше 50 МБ через бота.",
+            reply_markup=inline_main_menu
+        )
+        logger.warning(f"Файл {filename} от пользователя {user_id} ({user_name}) слишком большой для загрузки")
+        await state.clear()
+        return
+
+    loading_msg = await callback.message.edit_text(
+        f"⏳ <b>Загрузка файла:</b> <i>{filename}</i>\n"
+        f"📊 [{'░'*20}]\n"
+        f"📄 <b>Загружено:</b> 0.00/{size_mb:.2f} МБ (0%)\n"
+        f"⚡ <b>Скорость:</b> 0 МБ/с",
         parse_mode="HTML"
     )
 
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    try:
+        tg_file = await callback.bot.get_file(document.file_id)
+        url = f"https://api.telegram.org/file/bot{callback.bot.token}/{tg_file.file_path}"
 
-    # Получаем мета-данные файла
-    file = await callback.bot.get_file(document.file_id)
+        chunk_size = 1024 * 1024  # 1 MB
+        downloaded = 0
+        last_percent = -1
+        start_time = time.time()
+        BAR_LENGTH = 12
 
-    # Загружаем файл по пути
-    await callback.bot.download_file(file.file_path, destination=filepath)
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
 
-    # После загрузки редактируем сообщение на успешное добавление
-    await loading_message.edit_text(
-        f"✅ <b>Руководство</b> <i>{filename}</i> <b>успешно добавлено!</b> 🎉\n\n"
-        "📂 Оно теперь доступно для использования.",
-        parse_mode="HTML",
-        reply_markup=inline_main_menu
-    )
+        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
+            async with session.get(url) as resp:
+                async with aiofiles.open(filepath, "wb") as f:
+                    async for chunk in resp.content.iter_chunked(chunk_size):
+                        await f.write(chunk)
+                        downloaded += len(chunk)
+
+                        percent = int(downloaded / document.file_size * 100)
+                        elapsed = max(time.time() - start_time, 0.001)
+                        speed = downloaded / (1024*1024) / elapsed
+                        downloaded_mb = downloaded / (1024*1024)
+
+                        if percent != last_percent:
+                            filled_length = int(BAR_LENGTH * percent // 100)
+                            bar = "█" * filled_length + "░" * (BAR_LENGTH - filled_length)
+
+                            await loading_msg.edit_text(
+                                f"⏳ <b>Загрузка файла:</b> <i>{filename}</i>\n"
+                                f"📊 [{bar}] {percent}%\n"
+                                f"📄 <b>Загружено:</b> {downloaded_mb:.2f}/{size_mb:.2f} МБ\n"
+                                f"⚡ <b>Скорость:</b> {speed:.2f} МБ/с",
+                                parse_mode="HTML"
+                            )
+                            last_percent = percent
+
+        await loading_msg.edit_text(
+            f"✅ <b>Руководство:</b> <i>{filename}</i> <b>успешно добавлено!</b> 🎉\n\n"
+            "📂 Оно теперь доступно для использования.",
+            parse_mode="HTML",
+            reply_markup=inline_main_menu
+        )
+
+        logger.info(f"Файл {filename} успешно загружен пользователем {user_id} ({user_name})")
+
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке файла {filename} пользователем {user_id} ({user_name}): {e}")
+        await loading_msg.edit_text(
+            f"❌ Произошла ошибка при загрузке файла:\n<i>{e}</i>",
+            parse_mode="HTML",
+            reply_markup=inline_main_menu
+        )
+
     await state.clear()
+
+
 
 # Отмена
 @editor_router.callback_query(lambda c: c.data == "manual_add_cancel", Register.confirm_upload)
