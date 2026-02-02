@@ -273,18 +273,31 @@ async def init_db(bot):
     
     
 def cleanup_old_files():
-    """Удаляет файлы из TEMP_DIR старше 24 часов."""
+    """Удаляет PDF и TXT файлы из TEMP_DIR старше MAX_FILE_AGE секунд."""
     if not os.path.exists(settings.TEMP_DIR):
+        logger.warning(f"Папка {settings.TEMP_DIR} не существует")
         return
 
     now = time.time()
+    deleted_count = 0
+
     for filename in os.listdir(settings.TEMP_DIR):
-        if filename.endswith('.pdf'):
+        if filename.lower().endswith((".pdf", ".txt")):
             file_path = os.path.join(settings.TEMP_DIR, filename)
-            file_time = os.path.getctime(file_path)
-            if now - file_time > 86400:
-                os.remove(file_path)
-                logger.info(f'Файл {filename} удален.')
+
+            try:
+                file_time = os.path.getctime(file_path)
+
+                if now - file_time > settings.MAX_FILE_AGE:
+                    os.remove(file_path)
+                    deleted_count += 1
+                    logger.info(f"Удалён временный файл: {filename}")
+
+            except Exception as e:
+                logger.error(f"Ошибка при удалении файла {filename}: {e}")
+
+    if deleted_count:
+        logger.info(f"Очистка завершена. Удалено файлов: {deleted_count}")
       
       
                 
@@ -385,30 +398,6 @@ def generate_admins_keyboard():
         keyboard.inline_keyboard.append(row)
     return keyboard
 
-
-# async def create_backup():
-#     if not os.path.exists(settings.DB_FILE):
-#         raise FileNotFoundError("Исходная база данных не найдена")
-
-#     if not os.path.exists(settings.DIR_DB):
-#         os.makedirs(settings.DIR_DB)
-
-#     # Ротация
-#     backup_files = [
-#         f for f in os.listdir(settings.DIR_DB)
-#         if f.startswith('Копия_БД_') and f.endswith('.db')
-#     ]
-
-#     if len(backup_files) >= 5:
-#         backup_files.sort(key=lambda x: os.path.getctime(
-#             os.path.join(settings.DIR_DB, x)))
-#         os.remove(os.path.join(settings.DIR_DB, backup_files[0]))
-
-#     timestamp = datetime.now().strftime("%d.%m.%Y_%H-%M-%S")
-#     backup_filename = f"Копия_БД_{timestamp}.db"
-#     backup_path = os.path.join(settings.DIR_DB, backup_filename)
-#     shutil.copy2(settings.DB_FILE, backup_path)
-#     return backup_filename
 
 
 async def create_backup():
@@ -707,6 +696,24 @@ def save_contacts(contacts):
         json.dump(contacts, file, ensure_ascii=False, indent=4)
 
 
+def create_keyboard_contact(machine_list):
+    buttons = []
+    for i in range(0, len(machine_list), 2):
+        row = []
+        # Добавляем первую кнопку в ряд
+        row.append(InlineKeyboardButton(
+            text=machine_list[i]['name'], callback_data=f"contact_{machine_list[i]['phone']}"))
+        # Проверяем, есть ли следующая кнопка
+        if i + 1 < len(machine_list):
+            row.append(InlineKeyboardButton(
+                text=machine_list[i + 1]['name'], callback_data=f"contact_{machine_list[i + 1]['phone']}"))
+        else:
+            # Если следующей кнопки нет, добавляем пустую кнопку
+            row.append(InlineKeyboardButton(text=" ", callback_data="ignore"))
+        buttons.append(row)
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
 def create_keyboard(machine_list, page: int = 0):
     buttons = []
 
@@ -761,28 +768,6 @@ def create_keyboard(machine_list, page: int = 0):
         InlineKeyboardButton(text=" ↩️ Назад", callback_data='back_2')
     ])
 
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
-
-
-def create_keyboard(machine_list):
-    buttons = []
-    for i in range(0, len(machine_list), 2):
-        row = []
-        # Добавляем первую кнопку в ряд
-        row.append(InlineKeyboardButton(
-            text=machine_list[i]['name'], callback_data=machine_list[i]['name']))
-        # Проверяем, есть ли следующая кнопка
-        if i + 1 < len(machine_list):
-            row.append(InlineKeyboardButton(
-                text=machine_list[i + 1]['name'], callback_data=machine_list[i + 1]['name']))
-        else:
-            # Если следующей кнопки нет, добавляем пустую кнопку
-            row.append(InlineKeyboardButton(text=" ", callback_data="ignore"))
-        buttons.append(row)
-    # Добавляем кнопку "Назад" на всю ширину
-    buttons.append([InlineKeyboardButton(
-        text=" ↩️ Назад", callback_data='back_2')])
-    # Создаем и возвращаем InlineKeyboardMarkup с кнопками
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
@@ -1265,6 +1250,7 @@ async def download_yadisk_backup(filename):
                 await f.write(await download_resp.read())
             return file_path
         
+        
 async def list_yadisk_backups():
     """
     Возвращает список резервных копий на Яндекс.Диске.
@@ -1315,3 +1301,128 @@ def history_keyboard(page: int, total_pages: int) -> InlineKeyboardMarkup:
     ])
 
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+async def list_yadisk_electroschemes(shop: str):
+    """
+    Возвращает список PDF-файлов для указанного цеха на Яндекс.Диске.
+    shop: str — '1', '2', '3', '11', ..., 'kmt'
+    """
+    headers = {"Authorization": f"OAuth {settings.YANDEX_DISK_TOKEN}"}
+    url = "https://cloud-api.yandex.net/v1/disk/resources"
+    path = f"/electroschemes/{shop}"  # путь к папке цеха
+    params = {"path": path, "fields": "_embedded.items"}
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, headers=headers, params=params) as resp:
+            if resp.status != 200:
+                text = await resp.text()
+                logger.error(f"Ошибка получения списка файлов с Яндекс.Диска: {text}")
+                return []
+
+            data = await resp.json()
+            items = data.get("_embedded", {}).get("items", [])
+
+            # Оставляем только PDF
+            pdf_files = [f["name"] for f in items if f["type"] == "file" and f["name"].lower().endswith(".pdf")]
+
+            # Сортировка по имени
+            pdf_files.sort()
+            return pdf_files
+        
+        
+def build_schemes_keyboard(
+    files: list[str], shop: str, page: int = 1, per_page: int = 6
+) -> InlineKeyboardMarkup:
+    """
+    Строит клавиатуру с файлами для выбранного цеха с пагинацией.
+    Названия файлов без расширения .pdf
+    """
+    inline_keyboard = []
+
+    total_pages = max(1, ceil(len(files) / per_page))
+    start = (page - 1) * per_page
+    end = start + per_page
+    page_files = files[start:end] if files else []
+
+    # Кнопки файлов
+    i = 0
+    while i < len(page_files):
+        # Убираем расширение .pdf для кнопки
+        display_name = page_files[i].rsplit(".", 1)[0]
+
+        if i == len(page_files) - 1 and len(page_files) % 2 != 0:
+            # последняя кнопка на всю ширину при нечётном числе
+            inline_keyboard.append([
+                InlineKeyboardButton(
+                    text=display_name,
+                    callback_data=f"schemes_file:{shop}:{start+i}"
+                )
+            ])
+            i += 1
+        else:
+            display_name_2 = page_files[i+1].rsplit(".", 1)[0]
+            inline_keyboard.append([
+                InlineKeyboardButton(
+                    text=display_name,
+                    callback_data=f"schemes_file:{shop}:{start+i}"
+                ),
+                InlineKeyboardButton(
+                    text=display_name_2,
+                    callback_data=f"schemes_file:{shop}:{start+i+1}"
+                )
+            ])
+            i += 2
+
+    # Навигация по страницам
+    nav_buttons = []
+    if page > 1:
+        nav_buttons.append(
+            InlineKeyboardButton(
+                text="⬅️ Предыдущая", callback_data=f"schemes_nav:{shop}:{page-1}"
+            )
+        )
+    if page < total_pages:
+        nav_buttons.append(
+            InlineKeyboardButton(
+                text="➡️ Следующая", callback_data=f"schemes_nav:{shop}:{page+1}"
+            )
+        )
+    if nav_buttons:
+        inline_keyboard.append(nav_buttons)
+
+    # Кнопка назад к выбору цеха
+    inline_keyboard.append([
+        InlineKeyboardButton(text="🔙 Выбор цеха", callback_data="back_to_shops")
+    ])
+
+    return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
+
+async def download_yadisk_file(path: str) -> str:
+    """
+    Скачивает файл с Яндекс.Диска по полному пути.
+    path: "/electroschemes/1/файл.pdf"
+    Возвращает путь к временно сохраненному файлу.
+    """
+    headers = {"Authorization": f"OAuth {settings.YANDEX_DISK_TOKEN}"}
+    url = "https://cloud-api.yandex.net/v1/disk/resources/download"
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, headers=headers, params={"path": path}) as resp:
+            if resp.status != 200:
+                text = await resp.text()
+                logger.error(f"Ошибка получения ссылки на файл {path}: {text}")
+                raise Exception(f"Не удалось получить ссылку на файл {path}")
+
+            data = await resp.json()
+            download_url = data.get("href")
+            if not download_url:
+                raise Exception(f"Не удалось получить download_url для {path}")
+
+        # Скачиваем файл
+        filename = os.path.basename(path)
+        temp_path = os.path.join(settings.DIR_DB, filename)
+        async with session.get(download_url) as download_resp:
+            async with aiofiles.open(temp_path, "wb") as f:
+                await f.write(await download_resp.read())
+        return temp_path
