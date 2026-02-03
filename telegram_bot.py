@@ -30,7 +30,7 @@ async def set_main_menu(bot: Bot):
     await bot.set_my_commands(main_menu_commands)
 
 storage = MemoryStorage()
-session = AiohttpSession()  # proxy="http://proxy.server:3128"
+session = AiohttpSession(session=settings.DOWNLOAD_TIMEOUT)  # proxy="http://proxy.server:3128"
 bot = Bot(token=settings.BOT_TOKEN, session=session)
 dp = Dispatcher(storage=storage)
 dp.include_router(router)
@@ -38,17 +38,17 @@ dp.include_router(router)
 
 
 # функция удаления файлов истории
-#async def periodic_cleanup():
-#    while True:
-#        logging.info("Запуск периодической очистки...")
-#        fs.cleanup_old_files()
-#        await asyncio.sleep(settings.CLEANUP_INTERVAL)
+async def periodic_cleanup():
+    while True:
+        logging.info("Запуск периодической очистки...")
+        fs.cleanup_old_files()
+        await asyncio.sleep(settings.CLEANUP_INTERVAL)
 
 
 async def main():
-    await fs.init_db(bot)  # Инициализация базы данных SQLite
+    await fs.init_db()  # Инициализация базы данных SQLite
     dp.startup.register(set_main_menu)
-    #asyncio.create_task(periodic_cleanup())
+    asyncio.create_task(periodic_cleanup())
     asyncio.create_task(fs.auto_backup_loop(bot))
     await dp.start_polling(bot)
     
