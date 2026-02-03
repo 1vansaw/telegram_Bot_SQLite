@@ -226,50 +226,29 @@ def delete_admins_from_access(user_id):
     return False
 
 
-async def init_db(bot):
+async def init_db():
     """Инициализация базы данных и создание таблицы tasks со всеми колонками."""
-    try:
-        async with aiosqlite.connect(settings.DB_FILE) as db:
-            # Создание таблицы со всеми колонками
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS tasks (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    date TEXT NOT NULL,
-                    workers TEXT NOT NULL,
-                    machine TEXT NOT NULL,
-                    shift TEXT NOT NULL,
-                    start_time TEXT NOT NULL,
-                    end_time TEXT,
-                    work_description TEXT,
-                    work_solution TEXT,
-                    fault_status TEXT,
-                    duration TEXT,
-                    inventory_number TEXT
-                )
-            ''')
-            await db.commit()
-        logger.info("База данных инициализирована.")
-        access_data = load_access_data()
-        main_admins = access_data.get("main_admins", [])
-        main_admin_id = main_admins[0]
-        try:
-            await bot.send_message(
-                chat_id=main_admin_id,
-                text="✅ База данных успешно инициализирована!"
+    async with aiosqlite.connect(settings.DB_FILE) as db:
+        # Создание таблицы со всеми колонками
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                date TEXT NOT NULL,
+                workers TEXT NOT NULL,
+                machine TEXT NOT NULL,
+                shift TEXT NOT NULL,
+                start_time TEXT NOT NULL,
+                end_time TEXT,
+                work_description TEXT,
+                work_solution TEXT,
+                fault_status TEXT,
+                duration TEXT,
+                inventory_number TEXT
             )
-        except Exception as e:
-            logger.error(f"Не удалось отправить сообщение главному администратору: {e}")
-    except Exception as e:
-        logger.error(f"Ошибка инициализации БД: {e}")
-        try:
-                await bot.send_message(
-                    chat_id=main_admins[0],
-                    text=f"❌ Ошибка при инициализации базы данных:\n\n<code>{e}</code>",
-                    parse_mode="HTML"
-                )
-        except Exception as send_error:
-            logger.error(f"Не удалось отправить сообщение админу: {send_error}")
+        ''')
+        await db.commit()
+    logger.info("База данных инициализирована.")
     
     
 def cleanup_old_files():
@@ -376,7 +355,6 @@ async def auto_backup_loop(bot):
 
 
 
-
 def generate_admins_keyboard():
     """Создает клавиатуру с ID пользователей."""
     access_data = load_access_data()
@@ -398,6 +376,30 @@ def generate_admins_keyboard():
         keyboard.inline_keyboard.append(row)
     return keyboard
 
+
+# async def create_backup():
+#     if not os.path.exists(settings.DB_FILE):
+#         raise FileNotFoundError("Исходная база данных не найдена")
+
+#     if not os.path.exists(settings.DIR_DB):
+#         os.makedirs(settings.DIR_DB)
+
+#     # Ротация
+#     backup_files = [
+#         f for f in os.listdir(settings.DIR_DB)
+#         if f.startswith('Копия_БД_') and f.endswith('.db')
+#     ]
+
+#     if len(backup_files) >= 5:
+#         backup_files.sort(key=lambda x: os.path.getctime(
+#             os.path.join(settings.DIR_DB, x)))
+#         os.remove(os.path.join(settings.DIR_DB, backup_files[0]))
+
+#     timestamp = datetime.now().strftime("%d.%m.%Y_%H-%M-%S")
+#     backup_filename = f"Копия_БД_{timestamp}.db"
+#     backup_path = os.path.join(settings.DIR_DB, backup_filename)
+#     shutil.copy2(settings.DB_FILE, backup_path)
+#     return backup_filename
 
 
 async def create_backup():
@@ -425,6 +427,7 @@ async def create_backup():
             backup_files.pop(0)
 
     return backup_filename
+
 
 
 
@@ -564,6 +567,7 @@ async def get_today_history():
 
     #separator = "\n---------------------------------------------\n"
     return messages
+
 
 async def load_db_data():
     """Загружает все записи из БД (асинхронно)."""
@@ -1250,7 +1254,6 @@ async def download_yadisk_backup(filename):
                 await f.write(await download_resp.read())
             return file_path
         
-        
 async def list_yadisk_backups():
     """
     Возвращает список резервных копий на Яндекс.Диске.
@@ -1279,7 +1282,7 @@ async def list_yadisk_backups():
             # Сортировка по дате создания (новые сверху)
             backups.sort(key=lambda x: x["created"], reverse=True)
             return backups
-
+        
 def history_keyboard(page: int, total_pages: int) -> InlineKeyboardMarkup:
     keyboard = []
 
@@ -1301,7 +1304,6 @@ def history_keyboard(page: int, total_pages: int) -> InlineKeyboardMarkup:
     ])
 
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
-
 
 async def list_yadisk_electroschemes(shop: str):
     """
