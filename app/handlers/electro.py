@@ -17,6 +17,8 @@ electroschemes_router = Router(name=__name__)
 logger = logging.getLogger(__name__)
 
 
+timeout = aiohttp.ClientTimeout(total=settings.DOWNLOAD_TIMEOUT)
+
 
 @electroschemes_router.message(F.text == "⚡ Электросхемы")
 async def open_electroschemes_menu(message: Message):
@@ -117,12 +119,10 @@ async def handle_file_selection(query: CallbackQuery):
             return
 
         filename = files[file_index]
-
-        # --- Генерируем уникальное имя временного файла ---
         unique_filename = f"{uuid.uuid4()}_{filename}"
         temp_path = os.path.join(settings.TEMP_DIR, unique_filename)
 
-        # --- Начальное сообщение о скачивании ---
+        # Начальное сообщение
         loading_msg = await query.message.edit_text(
             f"⏳ <b>Скачивание файла с Яндекс.Диска:</b>\n<i>{filename}</i>\n"
             f"📊 [{'░'*12}] 0%\n"
@@ -131,114 +131,81 @@ async def handle_file_selection(query: CallbackQuery):
             parse_mode="HTML"
         )
 
-        # --- Получаем ссылку на скачивание ---
-        headers = {"Authorization": f"OAuth {settings.YANDEX_DISK_TOKEN}"}
-        url_api = "https://cloud-api.yandex.net/v1/disk/resources/download"
+        # Настройки aiohttp
+        connector = aiohttp.TCPConnector(limit=0, ssl=False)
+        timeout = aiohttp.ClientTimeout(
+            total=settings.DOWNLOAD_TIMEOUT,
+            sock_connect=60,
+            sock_read=600
+        )
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                url_api,
-                headers=headers,
-                params={"path": f"/electroschemes/{shop}/{filename}"}
-            ) as resp:
+        async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
+            # Получаем ссылку на скачивание
+            headers = {"Authorization": f"OAuth {settings.YANDEX_DISK_TOKEN}"}
+            url_api = "https://cloud-api.yandex.net/v1/disk/resources/download"
+            async with session.get(url_api, headers=headers, params={"path": f"/electroschemes/{shop}/{filename}"}) as resp:
                 data = await resp.json()
                 download_url = data.get("href")
                 if not download_url:
                     await loading_msg.edit_text("❌ Не удалось получить ссылку для скачивания.")
                     return
 
-        chunk_size = 1024 * 1024  # 1 MB
-        downloaded = 0
-        last_percent = -1
-        start_time = time.time()
-        BAR_LENGTH = 12
+            # Скачиваем файл с прогресс-баром
+            chunk_size = 1024*1024  # 1 MB
+            downloaded = 0
+            last_percent = -1
+            start_time = time.time()
+            BAR_LENGTH = 12
 
-        # --- Скачиваем файл с прогресс-баром и обработкой ошибок ---
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(download_url) as resp:
-                    total_size = int(resp.headers.get("Content-Length", 0))
-                    async with aiofiles.open(temp_path, "wb") as f:
-                        async for chunk in resp.content.iter_chunked(chunk_size):
-                            try:
-                                await f.write(chunk)
-                                downloaded += len(chunk)
-                            except Exception as e:
-                                raise RuntimeError(f"Ошибка записи файла: {e}")
+            async with session.get(download_url) as resp:
+                total_size = int(resp.headers.get("Content-Length", 0))
+                async with aiofiles.open(temp_path, "wb") as f:
+                    async for chunk in resp.content.iter_chunked(chunk_size):
+                        await f.write(chunk)
+                        downloaded += len(chunk)
 
-                            percent = int(downloaded / total_size * 100) if total_size else 0
-                            elapsed = max(time.time() - start_time, 0.001)
-                            speed = downloaded / (1024*1024) / elapsed
-                            size_mb = total_size / (1024*1024)
-                            downloaded_mb = downloaded / (1024*1024)
+                        percent = int(downloaded / total_size * 100) if total_size else 0
+                        elapsed = max(time.time() - start_time, 0.001)
+                        speed = downloaded / (1024*1024) / elapsed
+                        downloaded_mb = downloaded / (1024*1024)
+                        size_mb = total_size / (1024*1024)
 
-                            # --- Адаптивное обновление прогресс-бара ---
-                            if size_mb <= 30:
-                                update = percent != last_percent
-                            else:
-                                update = (percent != last_percent) and (percent % 3 == 0 or percent == 100)
+                        # Обновление прогресс-бара
+                        if size_mb <= 30:
+                            update = percent != last_percent
+                        else:
+                            update = (percent != last_percent) and (percent % 3 == 0 or percent == 100)
 
-                            if update:
-                                filled_length = int(BAR_LENGTH * percent // 100)
-                                bar = "█" * filled_length + "░" * (BAR_LENGTH - filled_length)
+                        if update:
+                            filled_length = int(BAR_LENGTH * percent // 100)
+                            bar = "█" * filled_length + "░" * (BAR_LENGTH - filled_length)
 
-                                await loading_msg.edit_text(
-                                    f"⏳ <b>Скачивание файла:</b> <i>{filename}</i>\n"
-                                    f"📊 [{bar}] {percent}%\n"
-                                    f"📄 <b>Загружено:</b> {downloaded_mb:.2f}/{size_mb:.2f} МБ\n"
-                                    f"⚡ <b>Скорость:</b> {speed:.2f} МБ/с",
-                                    parse_mode="HTML"
-                                )
-                                last_percent = percent
-        except Exception as e:
-            logger.error(f"Ошибка при скачивании файла {filename}: {e}")
-            await loading_msg.edit_text(
-                f"❌ Ошибка при скачивании файла {filename}.\n"
-                f"Причина: {e}\nПопробуйте позже."
-            )
-            # удаляем частично скачанный файл
-            try:
-                os.remove(temp_path)
-            except Exception:
-                pass
-            return  # прекращаем выполнение
+                            await loading_msg.edit_text(
+                                f"⏳ <b>Скачивание файла:</b> <i>{filename}</i>\n"
+                                f"📊 [{bar}] {percent}%\n"
+                                f"📄 <b>Загружено:</b> {downloaded_mb:.2f}/{size_mb:.2f} МБ\n"
+                                f"⚡ <b>Скорость:</b> {speed:.2f} МБ/с",
+                                parse_mode="HTML"
+                            )
+                            last_percent = percent
 
-        # --- Файл скачан, подготовка к отправке ---
+        # Файл скачан, отправка
         file_size_mb = os.path.getsize(temp_path) / (1024*1024)
-        approx_speed = 0.1  # МБ/с, средняя скорость upload
-        approx_time = max(int(file_size_mb / approx_speed), 1)
-
         await loading_msg.edit_text(
-            f"✅ <b>Файл {filename} успешно загружен!</b>\n\n"
-            f"🔄 <b>Подготовка к отправке...</b>\n"
-            f"📄 Размер: {file_size_mb:.2f} МБ\n"
-            f"⏱ Примерное время отправки: ~{approx_time} сек\n"
-            f"⚠️ Время ориентировочное, зависит от скорости сети и Telegram",
+            f"✅ <b>Файл {filename} успешно загружен!</b>\n"
+            f"📄 Размер: {file_size_mb:.2f} МБ",
             parse_mode="HTML"
         )
 
-        # --- Отправка файла ---
-        try:
-            document = FSInputFile(path=temp_path)
-            await query.message.answer_document(document=document, caption=filename, reply_markup=inline_main_menu)
-        except Exception as e:
-            logger.error(f"Ошибка при отправке файла: {e}")
-            await loading_msg.edit_text(
-                f"❌ Не удалось отправить файл {filename}.\n"
-                f"Причина: {e}\nПопробуйте позже или скачайте файл напрямую.",
-                parse_mode="HTML"
-            )
-            # файл оставляем для возможной повторной попытки
-            return
+        document = FSInputFile(path=temp_path)
+        await query.message.answer_document(document=document, caption=filename, reply_markup=inline_main_menu)
 
-        # --- Очистка временного файла ---
+        # Очистка
         try:
             os.remove(temp_path)
-            logger.info(f"Временный файл {temp_path} удалён после отправки.")
         except Exception as e:
             logger.warning(f"Не удалось удалить временный файл {temp_path}: {e}")
 
-        # --- Удаляем сообщение о загрузке ---
         try:
             await loading_msg.delete()
         except Exception:
