@@ -95,7 +95,7 @@ async def handle_navigation(query: CallbackQuery):
     keyboard = fs.build_schemes_keyboard(files, shop, page=page, per_page=settings.PER_PAGE)
 
     await query.message.edit_text(
-        f"📂 Схемы цеха {shop}\nСтраница {page}/{total_pages}",
+        f"📂 Схемы цеха {shop}\n📄 Страница {page}/{total_pages}",
         reply_markup=keyboard
     )
     await query.answer()
