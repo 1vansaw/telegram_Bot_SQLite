@@ -39,6 +39,7 @@ class Register(StatesGroup):
     search_record = State()
     edit_record = State()
     error_code = State()
+    error_code_828 = State()
     waiting_for_search_phrase = State()
     viewing_record = State()
     editing_field = State()
