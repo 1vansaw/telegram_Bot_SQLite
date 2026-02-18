@@ -940,7 +940,7 @@ def build_navigation_buttons(current_index, total, user_role =None):
             text="⬅️ Предыдущая", callback_data="prev_record"))
     if current_index < total - 1:
         nav_buttons.append(InlineKeyboardButton(
-            text="➡️ Следующая", callback_data="next_record"))
+            text="Следующая ➡️", callback_data="next_record"))
 
     if nav_buttons:
         buttons.append(nav_buttons)
@@ -1113,17 +1113,50 @@ def manuals_keyboard(files: list[str], page: int) -> InlineKeyboardMarkup:
     if nav:
         keyboard.append(nav)
 
-    # 🧮 Калькулятор
     keyboard.append([
-        InlineKeyboardButton(text="🧮 Калькулятор ошибок", callback_data="error_calculator")
-    ])
-
+    InlineKeyboardButton(text="🧮 Ошибки 840D", callback_data="error_calculator"),
+    InlineKeyboardButton(text="🧮 Ошибки 828D", callback_data="error_calculator_828D")])
+    
     # 🔙 Главное меню
     keyboard.append([
         InlineKeyboardButton(text="🔙 Главное меню", callback_data="main_menu")
     ])
 
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+def return_bits_828D(error_code: int) -> str:
+    if 700000 <= error_code < 700248:
+        delta = error_code - 700000
+        byte = delta // 8
+        bit = delta % 8
+        index = byte * 8 + bit
+        dbd = 1000 + index * 4
+
+        return (
+            f"🔢 <b>Код ошибки:</b> <code>{error_code}</code>\n\n"
+            f"🧩 <b>Результат:</b>\n"
+            f"   ├ Бит PLC: DB1600.DBX <code>{byte}.{bit}</code>\n"
+            f"   ├ Параметр: <code>MD14516[{index}]</code>\n"
+            f"   └ Переменная: DB1600.DBD <code>{dbd}</code>\n\n"
+
+            f"⚙ <b>Биты MD14516[{index}]:</b>\n"
+            f"   ├ Бит 0 – Запрет NC старта\n"
+            f"   ├ Бит 1 – Запрет чтения кадра\n"
+            f"   ├ Бит 2 – Блокировка подачи\n"
+            f"   ├ Бит 3 – Аварийный останов\n"
+            f"   ├ Бит 4 – PLC стоп\n"
+            f"   ├ Бит 5 – Резерв / не используется\n"
+            f"   ├ Бит 6 – Сброс через DB1600.DBX3000.0\n"
+            f"   └ Бит 7 – Выключение (Reset PO)\n"
+        )
+
+    return (
+        "❌ <b>Ошибка</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "🚫 Введённый код вне допустимого диапазона.\n"
+        "📌 Допустимый диапазон: <code>700000 – 700247</code>"
+    )
 
 
 # Формирование клавиатуры для удаления
