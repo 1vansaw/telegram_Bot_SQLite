@@ -167,7 +167,67 @@ async def send_manual(callback: CallbackQuery):
     finally:
         await loading_msg.delete()
 
+        
+@manuals_router.callback_query(F.data == 'error_calculator_828D')
+async def start_error_calculator_828(callback: CallbackQuery, state: FSMContext):
+    data = fs.load_access_data()
+    user_id = callback.from_user.id
+    role = fs.get_user_role(user_id, data)
 
+    if role in ["👑 Главный администратор!", "🛠 Администратор!", "👥 Пользователь"]:
+        await callback.answer()
+
+        # Пытаемся удалить сообщение с кнопками руководств
+        try:
+            await callback.message.delete()
+        except Exception as e:
+            logger.warning(f"Не удалось удалить сообщение с руководствами: {e}")
+
+        # Отправляем запрос на ввод ошибки
+        await callback.message.answer(
+            "🧮 **Калькулятор ошибок**\n\n"
+            "❗ Введите номер ошибки:",
+            reply_markup=ReplyKeyboardRemove(),
+            parse_mode="Markdown"
+        )
+        await state.set_state(Register.error_code_828)
+    else:
+        await callback.answer()
+        await callback.message.answer('⛔ У вас нет доступа')
+        
+        
+@manuals_router.message(Register.error_code_828)
+async def process_error_code_828(message: Message, state: FSMContext):
+    try:
+        error_code = int(message.text.strip())
+    except ValueError:
+        await message.answer(
+            "❗ Введите корректный <b>числовой</b> код ошибки:",
+            parse_mode="HTML"
+        )
+        return
+
+    # Проверяем диапазон
+    if not (700000 <= error_code < 700248):
+        await message.answer(
+            "🚫 <b>Код вне допустимого диапазона</b>\n\n"
+            "📌 Допустимый диапазон: <code>700000 – 700247</code>\n\n"
+            "🔁 Попробуйте снова или выйдите в меню:",
+            parse_mode="HTML",
+            reply_markup=inline_main_menu
+        )
+        return  # ❗ состояние НЕ очищаем
+
+    # Если всё корректно
+    result = fs.return_bits_828D(error_code)
+
+    await message.answer(result, parse_mode="HTML",reply_markup=inline_main_menu)
+
+    # ✅ Очищаем состояние только после успешного ввода
+    await state.clear()
+        
+        
+        
 
 @manuals_router.callback_query(F.data == 'error_calculator')
 async def start_error_calculator(callback: CallbackQuery, state: FSMContext):
